@@ -1,0 +1,23 @@
+# system and editor files
+.DS_Store
+Icon?
+._*
+Thumbs.db
+*.swp
+
+# MATLAB, R and Python artefacts
+*.asv
+*.mat
+.Rhistory
+.RData
+.Rproj.user/
+__pycache__/
+*.pyc
+*.ipynb_checkpoints/
+
+# analysis outputs (none are tracked; results are reproduced from PPMI data)
+*.nii
+*.nii.gz
+*.pdf
+*.png
+*.log

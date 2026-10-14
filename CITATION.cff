@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the paper and the archived release."
+title: "Apathy marks brain network and genetic vulnerability to cognitive decline in Parkinson's disease: analysis code"
+type: software
+version: 1.0.0
+date-released: 2026-10-14
+license: MIT
+authors:
+  - family-names: Attaallah
+    given-names: Bahaaeddin
+    affiliation: "Department of Brain Sciences, Imperial College London, UK; Department of Neurology, Imperial College NHS Trust, London, UK"
+    email: b.attaallah@imperial.ac.uk
+  - family-names: Geranmayeh
+    given-names: Fatemeh
+    affiliation: "Department of Brain Sciences, Imperial College London, UK; Department of Neurology, Imperial College NHS Trust, London, UK"
+  - family-names: Noyce
+    given-names: Alastair
+    affiliation: "Centre for Preventive Neurology, Queen Mary University of London, UK; Department of Neurology, The Royal London Hospital, Barts Health NHS Trust, London, UK"
+  - family-names: Malhotra
+    given-names: Paresh
+    affiliation: "Department of Brain Sciences, Imperial College London, UK; Department of Neurology, Imperial College NHS Trust, London, UK; UK Dementia Research Institute Care Research and Technology Centre, Imperial College London, UK"
+keywords:
+  - Parkinson's disease
+  - apathy
+  - impulse-control behaviours
+  - functional connectivity
+  - Network-Based Statistic
+  - PPMI
+abstract: "Code for the main analyses and figures of the paper (Parkinson's Precision Medicine Initiative cohort): cohort construction and longitudinal mixed-effects models, the bifactor measurement model of global cognition, fMRIPrep/XCP-D preprocessing submission with run selection, the Network-Based Statistic with residualised-regressor permutation inference, the connectivity-to-outcome analyses and the scripts that draw Figures 1 to 5. No participant-level data are included."
