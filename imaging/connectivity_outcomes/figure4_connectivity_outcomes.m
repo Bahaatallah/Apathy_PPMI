@@ -1,7 +1,7 @@
-function Figure4_render(featDir, runDir, slopesCSV, outStem)
+function figure4_connectivity_outcomes(featDir, runDir, slopesCSV, outStem)
 % Draws manuscript Figure 4 (three panels: a, differential FC x global cognitive slope; b, structural
 % correlates; c, left hippocampal atrophy) from the feature folder featDir, the output folder runDir
-% of Figure4.m and Figure4_Structural.m, and the participant-slope CSV slopesCSV; writes <outStem>.pdf,
+% of fc_cognitive_slope_mediation.m and fc_structural_correlates.m, and the participant-slope CSV slopesCSV; writes <outStem>.pdf,
 % <outStem>.png and <outStem>_printed_values.csv (every printed annotation string).
 % Every annotated value is read from the run tables; the plotted points and the bootstrap density are
 % recomputed from the exported features and slopes. Before export the script checks that no text box

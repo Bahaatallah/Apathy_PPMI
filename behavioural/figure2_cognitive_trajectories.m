@@ -1,6 +1,6 @@
 % Role: Primary cognition LMEs (g and MoCA), sensitivity models (winsorised, Cook's distance,
 %     minimal, baseline-adjusted, pattern mixture), sample-size table and Figure 2.
-% Run: on the workspace left by 01_clinical_cognition/Publicaiton_analysis.m, loaded in a fresh MATLAB
+% Run: on the workspace left by behavioural/cohort_phenotyping.m, loaded in a fresh MATLAB
 %     session (this script standardises columns of lmeT in place), with DESIGN_OVERRIDE absent
 %     (primary design); outputs go to outputDir.
 % Manuscript item: Figure 2; Results (cognitive decline); Supplementary Tables S3 Panel C, S4, S5,
@@ -64,7 +64,7 @@ cogLabels = {'Global Cognition (g)','Executive & Attention','Memory','Visuospati
 
 % -------------------------------------------------------------------------
 % Re-residualise sub-domain observed scores against the CURRENT globalVar.
-% Upstream obs_*_resid columns (built in Publicaiton_analysis.m) are
+% Upstream obs_*_resid columns (built in cohort_phenotyping.m) are
 % residualised against whichever g was active when that script ran. Flip
 % globalVar here and those columns become inconsistent with the selected
 % global outcome — fix that by overwriting in-script. Both lmeT and

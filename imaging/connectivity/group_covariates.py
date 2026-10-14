@@ -1,13 +1,13 @@
-# Role: Covariate and provenance loader imported by 10_fc_group.py at start-up; the connectome_continuous
-#     analysis builds its design with 10_fc_group.build_continuous_design and does not call the
+# Role: Covariate and provenance loader imported by nbs_group_analysis.py at start-up; the connectome_continuous
+#     analysis builds its design with nbs_group_analysis.build_continuous_design and does not call the
 #     functions of this module.
-# Manuscript item: none directly (dependency of 10_fc_group.py).
+# Manuscript item: none directly (dependency of nbs_group_analysis.py).
 """
 group_covariates.py — Shared covariate + provenance loader
 
 Single source of truth for covariate handling across all group analyses:
   - 07_group_config.sh::build_design_matrix (sh path, for TBSS/VBM voxelwise)
-  - 10_fc_group.py                          (FC connectome + seed)
+  - nbs_group_analysis.py                          (FC connectome + seed)
   - 11_vbm_group.sh::run_surface            (FreeSurfer surface GLM)
   - 12_morphometry_group.py                 (ROI morphometry stats)
 

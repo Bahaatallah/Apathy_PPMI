@@ -1,8 +1,8 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# 02_structural_preproc.sh — Structural MRI preprocessing
-# Usage: bash 02_structural_preproc.sh <subject_id> [bids_subdir]
-#   e.g. bash 02_structural_preproc.sh XXXXXX Apathy_BL
+# structural_preprocessing.sh — Structural MRI preprocessing
+# Usage: bash structural_preprocessing.sh <subject_id> [bids_subdir]
+#   e.g. bash structural_preprocessing.sh XXXXXX Apathy_BL
 #
 # Steps: reorient → crop → N4 → BET → FAST → FIRST → FLIRT → FNIRT → SIENAX
 #

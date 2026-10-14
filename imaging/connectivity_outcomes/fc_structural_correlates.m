@@ -8,7 +8,7 @@
 %          HC-normative residual correction is computed in parallel and used
 %          for the §7b sensitivity comparison only.
 %  Spearman partial via partialcorr; within-component BH FDR.
-%  Requires workspace from Figure4.m.
+%  Requires workspace from fc_cognitive_slope_mediation.m.
 % =========================================================================
 fprintf('\n[Structural] FreeSurfer volumes x FC components...\n');
 
@@ -148,7 +148,7 @@ fprintf('  Sensitivity:     HC-normative-corrected subcortical (normROI) — see
 predData  = nan(nFC, nAllFC);
 predNames = cell(1, nAllFC);
 for fi=1:nAllFC
-    predData(:,fi) = fcData(:,fi);   % suprathreshold (from Figure4.m)
+    predData(:,fi) = fcData(:,fi);   % suprathreshold (from fc_cognitive_slope_mediation.m)
     predNames{fi}  = fcShort{fi};
 end
 nPred = nAllFC;
@@ -167,7 +167,7 @@ ageSq  = fcMean.age .^ 2;
 Z_sub  = [fcMean.age, sexFC, fcMean.mean_FD, fc_eTIV];
 Z_cort = [fcMean.age, sexFC, fcMean.mean_FD, fc_eTIV];
 
-% Defensive existence checks for M2 sensitivity covariates (Figure4.m
+% Defensive existence checks for M2 sensitivity covariates (fc_cognitive_slope_mediation.m
 % defines these at L423-428; this guards against running structural alone).
 if ~exist('baselineEduc','var'),   baselineEduc   = nan(nFC,1); end
 if ~exist('baselineDur','var'),    baselineDur    = nan(nFC,1); end
@@ -627,7 +627,7 @@ fprintf('  Saved: Table_Structural_Lateralised.csv\n');
 fprintf('\n[13] Longitudinal hippocampus slope x FC (hypothesis-driven)...\n');
 
 %% 13.0 Defensive extraction: baselineEduc (added 2026-04-20)
-%  If Figure4.m was not re-run after the covCandsMap update, baselineEduc
+%  If fc_cognitive_slope_mediation.m was not re-run after the covCandsMap update, baselineEduc
 %  will not exist in the workspace. Pull it from Tlong inline here.
 if ~exist('baselineEduc','var')
     baselineEduc = nan(nFC,1);
@@ -842,7 +842,7 @@ writetable(cell2table(vertcat(rows_sl{:}), ...
     fullfile(outputDir,'Table_Hippocampus_Slope_x_FC.csv'));
 fprintf('\n  Saved: Table_Hippocampus_Slope_x_FC.csv (both models, 24 rows)\n');
 
-% Per-subject longitudinal data for Figure4.m panel (g)
+% Per-subject longitudinal data for fc_cognitive_slope_mediation.m panel (g)
 TlongHipp = table(fcPATNO, slope_bi, slope_L, slope_R, vBL_bi, vBL_L, vBL_R, fc_eTIV, ...
     'VariableNames', {'PATNO','slope_bilateral','slope_left','slope_right', ...
                       'vBL_bilateral','vBL_left','vBL_right','eTIV_BL'});

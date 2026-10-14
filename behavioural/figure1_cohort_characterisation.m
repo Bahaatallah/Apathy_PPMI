@@ -1,7 +1,7 @@
 % Role: Figure 1 renderer (Okabe-Ito palette); writes the Table 1 and Supplementary Table S1 CSVs
 %     (Table1_Baseline_Demographics.csv, SuppTable1_PostHoc_Pairwise.csv) and the dimensional-view
 %     figure.
-% Run: on the workspace left by 01_clinical_cognition/Publicaiton_analysis.m, loaded in a fresh MATLAB
+% Run: on the workspace left by behavioural/cohort_phenotyping.m, loaded in a fresh MATLAB
 %     session; outputs go to outputDir. Set FIG_SUPPRESS_ID_EXPORTS = true before running to skip
 %     the two participant-identifier exports.
 % Manuscript item: Figure 1; Table 1; Supplementary Figure S2; Supplementary Table S1.
@@ -17,7 +17,7 @@
 %  Figure 1 : (a) Prevalence bar,  (b) Clinical radar,  (c) Sankey transitions
 % =========================================================================
 % --- Publication colour palette (Okabe-Ito, colourblind-safe) -------------
-% Okabe-Ito values, shared with Figure2.m, Figure3.m and Figure4.m.
+% Okabe-Ito values, shared with figure2_cognitive_trajectories.m, figure5_genetic_moderation.m and fc_cognitive_slope_mediation.m.
 COL.neither  = [0.00 0.60 0.50];   % Okabe-Ito bluish green
 COL.apathy   = [0.90 0.60 0.00];   % Okabe-Ito orange      
 COL.icb      = [0.00 0.45 0.70];   % Okabe-Ito blue        

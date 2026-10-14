@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# Role: Circos helpers with atlas-derived parcel labels (atlas_4S256Parcels_labels_xcpd.tsv, given
+# Role: Circos helpers with atlas-derived parcel labels (atlas_4S256Parcels_labels.tsv, given
 #     with --atlas-labels); no hard-coded label list.
 # Manuscript item: Figure 3 and Supplementary Figure S4 (chord panels).
-"""plot_nbs_circos_revised.py: chord-diagram helpers for the NBS figures.
+"""circos_helpers.py: chord-diagram helpers for the NBS figures.
 
 All 256 parcels of the 4S256Parcels atlas are arranged around the ring by network (Schaefer-200
 cortex) or structure (CIT168 nuclei, thalamic nuclei, hippocampus, amygdala, cerebellum) in atlas
@@ -12,9 +12,9 @@ drawn as bezier curves (red, positive; blue, negative). draw_circos checks that 
 matches the component's recorded n_edges, that labels do not overlap or touch the ring and that
 leader lines do not cross, and returns what was drawn; audit_texts checks printed font sizes.
 
-Usage (stand-alone chord panels; the manuscript figures are made by plot_nbs_combined_revised.py):
-    python3 plot_nbs_circos_revised.py --nbs-dir <fc_connectome_continuous> \
-        --fig-dir <out> --atlas-labels <atlas_4S256Parcels_labels_xcpd.tsv>
+Usage (stand-alone chord panels; the manuscript figures are made by figure3_connectivity_components.py):
+    python3 circos_helpers.py --nbs-dir <fc_connectome_continuous> \
+        --fig-dir <out> --atlas-labels <atlas_4S256Parcels_labels.tsv>
 """
 from __future__ import annotations
 
@@ -156,7 +156,7 @@ def load_atlas_labels(source: str | Path) -> list[str]:
     """Return the 256 parcel labels in connectome / NBS node order.
 
     source: a table whose first two columns are 'index' and 'label'
-    (e.g. atlas_4S256Parcels_labels_xcpd.tsv); an XCP-D 4S256Parcels
+    (e.g. atlas_4S256Parcels_labels.tsv); an XCP-D 4S256Parcels
     timeseries or relmat TSV; or a directory searched recursively for such
     TSVs (all headers must be identical). File names are never printed
     (XCP-D names carry participant identifiers).

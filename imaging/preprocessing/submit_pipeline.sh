@@ -1,15 +1,15 @@
 #!/bin/bash
 # Role: Per-participant PBS chain on Imperial CX3: MRIQC 24.0.2, structural stream
-#     (02_structural_preproc.sh), diffusion, fMRIPrep 25.2.5, XCP-D 26.0.1 (linc, 36P,
+#     (structural_preprocessing.sh), diffusion, fMRIPrep 25.2.5, XCP-D 26.0.1 (linc, 36P,
 #     4S256Parcels), provenance (06_collect_provenance.py). Needs the containers, the TemplateFlow
-#     cache and the FreeSurfer licence set up by 05a_setup_hpc.sh.
+#     cache and the FreeSurfer licence set up by setup_hpc.sh.
 # Manuscript item: Methods (MRI acquisition and preprocessing). The diffusion job calls 03_diffusion_preproc.sh (no
 #     diffusion analysis is reported) and the provenance job calls 06_collect_provenance.py; neither
 #     is in this repository, so run with --steps mriqc,struct,func,xcpd. Participants whose default
 #     input was a short calibration series were re-run with the filters written by
-#     make_bids_filters.py (this folder).
+#     select_runs_by_length.py (this folder).
 # -----------------------------------------------------------------------
-# 05b_submit_pipeline.sh — Submit the full PPMI MRI pipeline on Imperial CX3
+# submit_pipeline.sh — Submit the full PPMI MRI pipeline on Imperial CX3
 #
 # Architecture (PBS job dependencies, per-subject):
 #   Job 1: MRIQC        (Singularity)               — QC before processing
@@ -23,7 +23,7 @@
 # Dependencies are per-subject: sub-X's diffusion waits for sub-X's structural.
 #
 # Usage:
-#   bash 05b_submit_pipeline.sh [--steps all|mriqc|struct|diff|func|xcpd|prov]
+#   bash submit_pipeline.sh [--steps all|mriqc|struct|diff|func|xcpd|prov]
 #                                [--subjects sub-XXXXXX,sub-YYYYYY]
 #                                [--dry-run]
 #
@@ -33,7 +33,7 @@
 set -euo pipefail
 
 # Session timepoint (default BL). For 24M follow-up, invoke as:
-#   SESSION=ses-24M bash 05b_submit_pipeline.sh --groups ALL_24M
+#   SESSION=ses-24M bash submit_pipeline.sh --groups ALL_24M
 SESSION="${SESSION:-ses-BL}"
 
 # ── Parse arguments ──────────────────────────────────────────────────
@@ -174,7 +174,7 @@ echo ""
 ERRORS=0
 if [[ "$STEPS" == "all" || "$STEPS" == *"func"* || "$STEPS" == *"mriqc"* ]]; then
     if [ ! -f "$CONTAINER_DIR/fmriprep-25.2.5.sif" ]; then
-        echo "ERROR: fMRIPrep container not found. Run 05a_setup_hpc.sh first."
+        echo "ERROR: fMRIPrep container not found. Run setup_hpc.sh first."
         ERRORS=$((ERRORS+1))
     fi
     if [ ! -f "$FS_LICENSE" ]; then
@@ -308,7 +308,7 @@ export SESSION="${SESSION}"
 
 echo "[\$(date)] Structural for sub-${SUBJECT} (\${SESSION}, processing on ephemeral)"
 
-bash "${SCRIPTS_DIR}/02_structural_preproc.sh" "${SUBJECT}" "${BIDS_SUBDIR}"
+bash "${SCRIPTS_DIR}/structural_preprocessing.sh" "${SUBJECT}" "${BIDS_SUBDIR}"
 
 # ── Copy finals from EPHEMERAL → HOME ──────────────────────────────
 SRC="${EPHEMERAL_DERIV}/structural/sub-${SUBJECT}/${SESSION}"

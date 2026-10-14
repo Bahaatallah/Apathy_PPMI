@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 # Role: Per-participant component features for the Figure 4 chain: for every FWE-significant
-#     component of an NBS output folder (04_group_nbs/10_fc_group.py), the mean Fisher-z FC over the
+#     component of an NBS output folder (imaging/connectivity/nbs_group_analysis.py), the mean Fisher-z FC over the
 #     component's edge list (<contrast>_<sign>_comp<k>_suprathresh_fc; missing relmat cells
 #     zero-filled as in the NBS engine), its PC1, and the covariate columns merged from
 #     --covariates. Writes <nbs-dir>/nbs_suprathreshold_fc.csv.
 # Manuscript item: connectivity features of Figure 4 and of the Results on connectivity and
 #     outcomes.
 """
-extract_nbs_suprathreshold_fc.py — Extract per-subject FC for supra-threshold edges
+extract_component_features.py — Extract per-subject FC for supra-threshold edges
                                     across ALL NBS contrasts (not just main effects).
 
 For each NBS contrast JSON in `nbs-dir`, this script:
 1. Reconstructs the contrast vector used by `build_continuous_design`
-2. Builds the projection-based reduced model (same as 10_fc_group._nbs_continuous)
+2. Builds the projection-based reduced model (same as nbs_group_analysis._nbs_continuous)
 3. Residualises edges on the reduced model
 4. Computes the partial Freedman-Lane t-statistic
 5. Thresholds at |t| > t_thresh (default 3.1, same as NBS)
@@ -32,9 +32,9 @@ Output: nbs_suprathreshold_fc.csv with columns:
   <all covariates merged from covariates_functional.csv>
 
 Usage (on HPC):
-    python3 extract_nbs_suprathreshold_fc.py
-    python3 extract_nbs_suprathreshold_fc.py --nbs-dir <path>
-    python3 extract_nbs_suprathreshold_fc.py --t-thresh 3.1
+    python3 extract_component_features.py
+    python3 extract_component_features.py --nbs-dir <path>
+    python3 extract_component_features.py --t-thresh 3.1
 
 Notes
 -----
@@ -44,7 +44,7 @@ Notes
   flip; columns are emitted for completeness but are informationally redundant
   with the non-mirror contrast.
 • The projection-based reduced model matches what _nbs_continuous does in
-  10_fc_group.py exactly, so suprathresh edge sets here coincide with the NBS
+  nbs_group_analysis.py exactly, so suprathresh edge sets here coincide with the NBS
   edge sets (previous version used a simpler all-nuisance-columns model which
   diverged from NBS t-stats for main effects).
 """
@@ -124,7 +124,7 @@ def load_subject_matrix(subj: str, session: str = "ses-BL") -> np.ndarray | None
 def build_contrast_vec(name: str, ev_names: list[str]) -> np.ndarray | None:
     """Reconstruct the contrast vector for a named NBS contrast.
 
-    Must match build_continuous_design in 10_fc_group.py.
+    Must match build_continuous_design in nbs_group_analysis.py.
     Returns None if a required EV column is missing.
     """
     def _idx(ev): return ev_names.index(ev) if ev in ev_names else -1
@@ -172,7 +172,7 @@ def compute_contrast_t_stats(design: np.ndarray, edges: np.ndarray,
                               cvec: np.ndarray) -> np.ndarray:
     """Compute the Freedman-Lane partial t-statistic for each edge under
     contrast `cvec`, using the SAME projection-based reduced model as
-    _nbs_continuous in 10_fc_group.py.
+    _nbs_continuous in nbs_group_analysis.py.
     """
     n_subj, n_ev = design.shape
     n_edges = edges.shape[1]

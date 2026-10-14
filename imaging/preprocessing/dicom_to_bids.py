@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-01_dicom_to_bids.py
+dicom_to_bids.py
 ===================
 Convert raw PPMI DICOM downloads to BIDS format using dcm2niix.
 
@@ -19,9 +19,9 @@ Requirements:
   dcm2niix must be on PATH (brew install dcm2niix / module load dcm2niix)
 
 Usage:
-  python 01_dicom_to_bids.py                    # Process all subjects
-  python 01_dicom_to_bids.py --subject XXXXXX   # Single subject
-  python 01_dicom_to_bids.py --dry-run           # Preview only
+  python dicom_to_bids.py                    # Process all subjects
+  python dicom_to_bids.py --subject XXXXXX   # Single subject
+  python dicom_to_bids.py --dry-run           # Preview only
 """
 
 import argparse
@@ -406,7 +406,7 @@ def convert_to_bids(zip_dir: Path, bids_dir: Path,
         "BIDSVersion": "1.9.0",
         "DatasetType": "raw",
         "License": "PPMI Data Use Agreement",
-        "GeneratedBy": [{"Name": "01_dicom_to_bids.py"}],
+        "GeneratedBy": [{"Name": "dicom_to_bids.py"}],
     }
     with open(desc_path, "w") as f:
         json.dump(desc, f, indent=2)
@@ -556,7 +556,7 @@ def generate_shell_script(zip_dir: Path, bids_dir: Path,
         "BIDSVersion": "1.9.0",
         "DatasetType": "raw",
         "License": "PPMI Data Use Agreement",
-        "GeneratedBy": [{"Name": "01_dicom_to_bids.py"}],
+        "GeneratedBy": [{"Name": "dicom_to_bids.py"}],
     }, indent=2)
     lines.append(f"cat > \"$BIDS_DIR/dataset_description.json\" << 'DESC'")
     lines.append(desc_json)

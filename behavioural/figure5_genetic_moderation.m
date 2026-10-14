@@ -1,7 +1,7 @@
 % Role: Genetic moderation LMEs (35-term FDR), apathy/ICB trajectory tests by genotype, per-subgroup
 %     correlations and the genetics figure, which is manuscript Figure 5 (the file keeps the name of
-%     the original Figure3.m).
-% Run: on the workspace left by 01_clinical_cognition/Publicaiton_analysis.m, loaded in a fresh MATLAB
+%     the original figure5_genetic_moderation.m).
+% Run: on the workspace left by behavioural/cohort_phenotyping.m, loaded in a fresh MATLAB
 %     session, with APATHY_MODE_OVERRIDE absent (default modes: APATHY_MODE 'continuous',
 %     STRATA_MODE 'visit'); outputs go to outputDir. The baseline-apathy refit of Supplementary
 %     Table S17 sets APATHY_MODE_OVERRIDE = 'baseline' after copying the baseline apathy and ICB

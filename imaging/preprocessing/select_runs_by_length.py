@@ -20,7 +20,7 @@ Outputs (next to this script):
 Exit status: 0 only if every roster participant got a valid, unambiguous filter.
 
 Usage (login node):
-  python3 make_bids_filters.py --roster <roster.txt> [--bids-root <BIDS>] [--session BL]
+  python3 select_runs_by_length.py --roster <roster.txt> [--bids-root <BIDS>] [--session BL]
 """
 import argparse
 import csv

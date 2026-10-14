@@ -4,7 +4,7 @@
 #     4S256Parcels relmat per participant.
 # Manuscript item: Table 2, Figure 3 and the NBS sensitivity analyses of the Supplement.
 """
-10_fc_group.py — Group functional connectivity & connectomics analysis
+nbs_group_analysis.py — Group functional connectivity & connectomics analysis
 
 Analyses XCP-D denoised outputs and structural-connectome outputs for group
 comparisons between Apathy_BL, Both_BL, and ICB_BL.
@@ -37,7 +37,7 @@ Analyses:
   3. Structural connectome group analysis (from 09_tractography_connectome.sh)
 
 Usage:
-  python3 10_fc_group.py --analysis all|connectome|seed|structural
+  python3 nbs_group_analysis.py --analysis all|connectome|seed|structural
                          [--nperm 10000]
                          [--atlas 4S256Parcels]
                          [--covariates covariates.csv]

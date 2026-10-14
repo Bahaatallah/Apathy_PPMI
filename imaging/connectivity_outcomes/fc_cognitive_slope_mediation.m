@@ -2,10 +2,10 @@
 %     slopes (reduced LME, section 2), path a and path b partial correlations, the mediation
 %     bootstrap and its sensitivity models; writes Table_Fig4_Sensitivity.csv,
 %     Table_Fig4_Mediation.csv, Table_Fig4_Mediation_Sensitivity.csv and the other Table_Fig4_*
-%     tables to outputDir. Step 2 is Figure4_Structural.m (same workspace), step 3 Figure4_render.m.
+%     tables to outputDir. Step 2 is fc_structural_correlates.m (same workspace), step 3 figure4_connectivity_outcomes.m.
 %     The figure this script draws itself (Fig4_FC_Apathy_CogDecline) is not the manuscript figure,
-%     which Figure4_render.m draws.
-% Run: on the workspace left by 01_clinical_cognition/Publicaiton_analysis.m, after setting
+%     which figure4_connectivity_outcomes.m draws.
+% Run: on the workspace left by behavioural/cohort_phenotyping.m, after setting
 %     outputDir (output folder), EXT_FC_DIR (folder holding nbs_suprathreshold_fc.csv and
 %     nbs_edge_strengths.csv), EXT_FEATURE_SET = 'P305' and EXT_MEDIATOR = 'diff' (the primary
 %     configuration).
@@ -116,7 +116,7 @@ else, sexFC=double(fcMean.sex); end
 % neg, shared_pos pos. QUIP main and interaction are null.
 %
 % Suprathreshold CSV now generated with the corrected projection-based reduced
-% model (matches _nbs_continuous in 10_fc_group.py) and includes all 4 sig
+% model (matches _nbs_continuous in nbs_group_analysis.py) and includes all 4 sig
 % contrasts (was previously apathy-only due to hardcoded extractor).
 % Ergo: path a (predictor -> FC) and DAT -> FC analyses now extend to all 4
 % components via supraIdx (rather than apathyIdx-only).
@@ -1135,7 +1135,7 @@ if hasDAT
     % --- (iii) DAT → FC: does dopamine drive FC disruption? ----------------
     %     Primary: Spearman partial r | age + sex + FD + eTIV.
     %     Covariate set matches the cross-sectional FreeSurfer ROI convention
-    %     (Figure4_Structural.m M1 Primary), so DAT-FC and DAT-volume effects
+    %     (fc_structural_correlates.m M1 Primary), so DAT-FC and DAT-volume effects
     %     are on the same covariate footing for structural/functional cross-
     %     reference. fcMean.TIV ≡ eTIV (same FreeSurfer-derived value).
     %     FDR family: across all components in supraIdx.
@@ -1564,7 +1564,7 @@ if exist(hippLongCSV_6c, 'file')
     fprintf('    rho_panelD attenuated/n.s.       → panel-d subset is a distinct population\n');
     fprintf('                                        for the cognitive-FC relationship\n');
 else
-    fprintf('    %s not found; run Figure4_Structural.m §13 first to enable this sensitivity.\n', ...
+    fprintf('    %s not found; run fc_structural_correlates.m §13 first to enable this sensitivity.\n', ...
         hippLongCSV_6c);
 end
 
@@ -1776,7 +1776,7 @@ ylim(ax_c, [0, 1.60 * maxDens_b]);
 
 % ----- (c) Structural forest — RH SM-DA × volumes ------------------------
 %   Reads Table_Structural_Correlates.csv (correct covariates from
-%   Figure4_Structural.m).  Lollipop: FDR=blue solid, unc=open, n.s.=gray.
+%   fc_structural_correlates.m).  Lollipop: FDR=blue solid, unc=open, n.s.=gray.
 ax_f = nexttile(13, [1,6]); set(ax_f,'Color',COL.bg); hold on;
 
 cSig_f  = [0.20 0.40 0.65];
@@ -1898,7 +1898,7 @@ if exist(structCSV_f, 'file') == 2
         set(ax_f, 'XTick', [], 'YTick', []);
     end
 else
-    text(ax_f, 0.5, 0.5, {'Run Figure4\_Structural.m first', ...
+    text(ax_f, 0.5, 0.5, {'Run fc\_structural\_correlates.m first', ...
         'to generate Table\_Structural\_Correlates.csv'}, ...
         'Units','normalized','FontSize',7,'Color',[0.5 0.5 0.5], ...
         'HorizontalAlignment','center','VerticalAlignment','middle');
@@ -1910,7 +1910,7 @@ formatAxis(ax_f, COL);
 
 % ----- (d) Longitudinal hippocampus × Ap-dom SM-DA FC density scatter ----
 %   Loads per-subject longitudinal hippocampus slopes (computed in
-%   Figure4_Structural.m §13). Primary uses raw slopes; winsorised copies
+%   fc_structural_correlates.m §13). Primary uses raw slopes; winsorised copies
 %   are available for sensitivity only.
 %   FC predictor: Diff(-)1 Ap-dominant SM-DA (idxStructural).
 %   Note: panel (g) uses a DIFFERENT FC component than panels d/e (which
@@ -2009,7 +2009,7 @@ if exist(longCSV_g, 'file') == 2
     xlabel('Apathy > ICB SM-DA FC (resid)', 'FontSize', 8);
     ylabel(sprintf('%s hippocampus \\Delta/yr (resid)', sideLbl_g), 'FontSize', 8);
 else
-    text(ax_g, 0.5, 0.5, {'Run Figure4\_Structural.m first', ...
+    text(ax_g, 0.5, 0.5, {'Run fc\_structural\_correlates.m first', ...
         'to generate Table\_Hippocampus\_Longitudinal\_Data.csv'}, ...
         'Units','normalized','FontSize',7,'Color',[0.5 0.5 0.5], ...
         'HorizontalAlignment','center','VerticalAlignment','middle');

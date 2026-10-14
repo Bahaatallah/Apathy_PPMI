@@ -1,9 +1,9 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# 05a_setup_hpc.sh — One-time HPC setup: pull containers, set up dirs
+# setup_hpc.sh — One-time HPC setup: pull containers, set up dirs
 # Run this ONCE on the HPC login node before submitting any jobs.
 #
-# Usage: bash 05a_setup_hpc.sh
+# Usage: bash setup_hpc.sh
 # -----------------------------------------------------------------------
 set -euo pipefail
 
@@ -149,7 +149,7 @@ echo "Next steps:"
 echo "  1. Ensure your FreeSurfer license is at: $FREESURFER_LICENSE"
 echo "  2. Upload your BIDS data to: $RDS_PROJECT/MRI_Data/BIDS/"
 echo "  3. Upload pipeline scripts to: $RDS_PROJECT/MRI_Data/scripts/"
-echo "  4. Run: bash 05b_submit_pipeline.sh"
+echo "  4. Run: bash submit_pipeline.sh"
 echo ""
 echo "Storage layout:"
 echo "  Home (persistent):      finals, BIDS, FreeSurfer, provenance"

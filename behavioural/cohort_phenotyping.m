@@ -1,8 +1,8 @@
 % Role: Master clinical script: cohort, apathy-composite and QUIP-S phenotyping, the four-group
 %     classification and the longitudinal tables with the bifactor g scores merged (lmeT, Tpd_lme,
-%     TpdSub),. Its workspace is the input of 06_figures/Figure1.m, Figure2.m and Figure3.m and of
-%     05_mediation_moderation/Figure4.m. It reads cfa_factor_scores.csv (written by
-%     02_cfa_bifactor/ppm_cfa_Gemeni_bothModels.R) from its own output folder outputDir
+%     TpdSub),. Its workspace is the input of behavioural/figure1_cohort_characterisation.m, figure2_cognitive_trajectories.m and figure5_genetic_moderation.m and of
+%     imaging/connectivity_outcomes/fc_cognitive_slope_mediation.m. It reads cfa_factor_scores.csv (written by
+%     behavioural/cognition_bifactor_cfa.R) from its own output folder outputDir
 %     ($PPMI_CLINICAL_ROOT/revision/figures/regenerated): copy the file there before running.
 % Manuscript item: cohort and four-group counts (Results; Figure 1a); master workspace of Figures 1,
 %     2, 4 and 5 and of Table 1; apathy-composite reliability (console output).
@@ -48,7 +48,7 @@ mocaFile  = fullfile(downloadPath, 'Montreal_Cognitive_Assessment__MoCA__16Mar20
 volFile     = fullfile(dlDir,  'FS7_ASEG_VOL_16Mar2026.csv');
 
 % --- Output directory ----------------------------------------------------
-% REVISION DRIVER COPY (2026-08-29): identical to GD/Publicaiton_analysis.m
+% REVISION DRIVER COPY (2026-08-29): identical to GD/cohort_phenotyping.m
 % except this one line: ALL outputs are redirected into the revision
 % workspace so no existing generated file is overwritten.
 outputDir = fullfile(getenv('PPMI_CLINICAL_ROOT'), 'revision/figures/regenerated');

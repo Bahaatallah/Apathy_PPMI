@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # Role: NBS surfaces + chord diagrams (atlas-derived labels read with --atlas-labels, printed-width
-#     layout); imports plot_nbs_circos_revised.py from this folder.
+#     layout); imports circos_helpers.py from this folder.
 # Manuscript item: Figure 3 (N = 305 run) and Supplementary Figure S4 (N = 343 run).
-"""plot_nbs_combined_revised.py: manuscript Figure 3 (and Supplementary Figure S4 for the extended sample).
+"""figure3_connectivity_components.py: manuscript Figure 3 (and Supplementary Figure S4 for the extended sample).
 
 One row per significant NBS contrast, five columns: LH lateral, LH medial, RH lateral, RH medial
 surface maps of signed node strength, and a chord diagram of the component edges. The figure is
@@ -14,8 +14,8 @@ strings, colour range, text checks). Node strength is the sum, over the signific
 parcel belongs to, of -log10(p_FWE) * sqrt(n_edges), signed by the direction of the component.
 
 Usage:
-    python3 plot_nbs_combined_revised.py --nbs-dir <run>/fc_connectome_continuous \
-        --atlas-labels atlas_4S256Parcels_labels_xcpd.tsv --fig-dir <out> \
+    python3 figure3_connectivity_components.py --nbs-dir <run>/fc_connectome_continuous \
+        --atlas-labels atlas_4S256Parcels_labels.tsv --fig-dir <out> \
         --contrasts main_apathy diff_apathy_gt_quip interaction_apathyxquip --out-name Figure3
     (--sample-label "extended sample" for the N = 343 run; --svg also writes an SVG)
 """
@@ -39,7 +39,7 @@ import numpy as np
 
 # circos helpers (atlas-derived labels and layout; draw_circos refuses an edge list that does not
 # match the component's n_edges)
-from plot_nbs_circos_revised import (
+from circos_helpers import (
     CONTRAST_TITLES,
     NEG_EDGE_COLOR,
     NET_SHORT,
@@ -217,7 +217,7 @@ def main():
     p.add_argument("--fig-dir", required=True, type=Path)
     p.add_argument("--atlas-labels", required=True,
                    help="4S256Parcels labels: index/label table "
-                        "(atlas_4S256Parcels_labels_xcpd.tsv), XCP-D "
+                        "(atlas_4S256Parcels_labels.tsv), XCP-D "
                         "timeseries/relmat TSV, or a directory of them")
     p.add_argument("--p-thresh", type=float, default=0.05)
     p.add_argument("--contrasts", nargs="*", default=None,
