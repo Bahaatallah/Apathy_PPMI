@@ -89,7 +89,7 @@ panelTitle(ax, 'b', 'Structural correlates', FStit, FSlet, COL);
 axD = nexttile(15,[1,6]); ax = axD; set(ax,'Color',COL.bg); hold(ax,'on');
 pat = double(str2double(sid)); [~,li] = ismember(pat, double(Tl.PATNO));
 slL=nan(height(F),1); vB=nan(height(F),1); mk=li>0; slL(mk)=Tl.slope_left(li(mk)); vB(mk)=Tl.vBL_left(li(mk));
-Zg=[age sexN FD educ vB]; okg=~isnan(slL)&~isnan(fcDiff)&all(~isnan(Zg),2);
+Zg=[age sexN FD vB]; okg=~isnan(slL)&~isnan(fcDiff)&all(~isnan(Zg),2);   % M1 covariates: age, sex, FD, baseline volume (education is an M2 covariate)
 Zr=zeros(sum(okg),size(Zg,2)); for cc=1:size(Zg,2), Zr(:,cc)=tiedrank(Zg(okg,cc)); end; Zr=[ones(sum(okg),1) Zr];
 xr=tiedrank(fcDiff(okg)); yr=tiedrank(slL(okg)); xr=xr-Zr*(Zr\xr); yr=yr-Zr*(Zr\yr);
 try, dens=mvksdensity([xr yr],[xr yr],'Bandwidth',[std(xr)*0.35, std(yr)*0.35]); catch, dens=ones(size(xr)); end
@@ -159,7 +159,7 @@ end
 function out=ternary(c,a,b), if c,out=a;else,out=b;end, end
 function s=fmtP(p), if isnan(p), s='NaN'; elseif p<0.001, s='< 0.001'; else, s=sprintf('%.3f',p); end, end
 function s=eqP(p)
-    % "= 0.035" or "< 0.001" (same rounding as fmtP of the 2026-09-13 version)
+    % "= 0.035" or "< 0.001" (same rounding as fmtP)
     s = fmtP(p); if ~startsWith(s,'<'), s = ['= ' s]; end
 end
 function formatAxis(ax,COL)

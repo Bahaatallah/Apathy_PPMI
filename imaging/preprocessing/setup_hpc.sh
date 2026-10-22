@@ -127,8 +127,7 @@ echo ""
 echo "[6/6] Verifying available modules..."
 echo ""
 echo "  Module availability:"
-for mod in "FSL/6.0.7.17" "FreeSurfer/7.4.1-centos8_x86_64" "ANTs/2.3.5-foss-2021a" \
-           "MRtrix/3.0.4-foss-2022b" "AFNI/24.0.02-foss-2023a"; do
+for mod in "FSL/6.0.7.17" "FreeSurfer/7.4.1-centos8_x86_64" "ANTs/2.3.5-foss-2021a"; do
     if module avail "$mod" 2>&1 | grep -q "$mod"; then
         echo "    ✓ $mod"
     else

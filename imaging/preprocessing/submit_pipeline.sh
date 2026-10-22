@@ -1,11 +1,11 @@
 #!/bin/bash
 # Role: Per-participant PBS chain on Imperial CX3: MRIQC 24.0.2, structural stream
-#     (structural_preprocessing.sh), diffusion, fMRIPrep 25.2.5, XCP-D 26.0.1 (linc, 36P,
+#     (structural_preprocessing.sh), fMRIPrep 25.2.5, XCP-D 26.0.1 (linc, 36P,
 #     4S256Parcels), provenance (06_collect_provenance.py). Needs the containers, the TemplateFlow
 #     cache and the FreeSurfer licence set up by setup_hpc.sh.
-# Manuscript item: Methods (MRI acquisition and preprocessing). The diffusion job calls 03_diffusion_preproc.sh (no
-#     diffusion analysis is reported) and the provenance job calls 06_collect_provenance.py; neither
-#     is in this repository, so run with --steps mriqc,struct,func,xcpd. Participants whose default
+# Manuscript item: Methods (MRI acquisition and preprocessing). The provenance job calls
+#     06_collect_provenance.py, which is not in this repository, so run with
+#     --steps mriqc,struct,func,xcpd. Participants whose default
 #     input was a short calibration series were re-run with the filters written by
 #     select_runs_by_length.py (this folder).
 # -----------------------------------------------------------------------
@@ -14,16 +14,15 @@
 # Architecture (PBS job dependencies, per-subject):
 #   Job 1: MRIQC        (Singularity)               — QC before processing
 #   Job 2: Structural   (FreeSurfer + ANTs modules)  — depends on MRIQC
-#   Job 3: Diffusion    (MRtrix3 + FSL GPU)          — depends on Structural
 #   Job 4: fMRIPrep     (Singularity)                — depends on Structural
 #   Job 5: XCP-D        (Singularity)                — depends on fMRIPrep
 #   Job 6: Provenance   (Python)                     — depends on all
 #
 # Each subject gets its own set of jobs (no PBS arrays — CX3 restricts them).
-# Dependencies are per-subject: sub-X's diffusion waits for sub-X's structural.
+# Dependencies are per-subject: sub-X's fMRIPrep waits for sub-X's structural.
 #
 # Usage:
-#   bash submit_pipeline.sh [--steps all|mriqc|struct|diff|func|xcpd|prov]
+#   bash submit_pipeline.sh [--steps all|mriqc|struct|func|xcpd|prov]
 #                                [--subjects sub-XXXXXX,sub-YYYYYY]
 #                                [--dry-run]
 #
@@ -57,15 +56,13 @@ done
 # EPHEMERAL (~11 TB): ALL intermediate processing, containers, fMRIPrep work
 #
 # Per-subject storage estimate (with cleanup):
-#   Structural finals:  ~200 MB (brain, mask, warps, FAST, FIRST, sienax)
 #   FreeSurfer:         ~1 GB
-#   Diffusion finals:   ~500 MB (preprocessed DWI 4D, tensor, all scalars, MNI maps)
 #   fMRIPrep output:    ~3 GB   (confounds, preprocessed BOLD, boldref)
 #   XCP-D output:       ~1 GB   (connectivity matrices, denoised BOLD, parcellations)
 #   MRIQC:              ~50 MB  (reports, IQMs)
-#   Total per subject:  ~5.75 GB on Home
-#   For 55 subjects:    ~316 GB → fits in current Home (325 GB free)
-#   For 100 subjects:   ~575 GB → may need cleanup or quota increase
+#   Total per subject:  ~5 GB on Home
+#   For 55 subjects:    ~275 GB
+#   For 100 subjects:   ~500 GB
 #
 # Strategy: process on EPHEMERAL, copy finals to HOME, delete ephemeral working data
 
@@ -110,7 +107,7 @@ echo "Dry run:           $DRY_RUN"
 echo ""
 echo "Storage strategy:"
 echo "  Processing on: Ephemeral (11 TB)"
-echo "  Finals kept on: Home (~5.75 GB/subject)"
+echo "  Finals kept on: Home (~5 GB/subject)"
 echo ""
 
 # ── Build subject list ───────────────────────────────────────────────
@@ -213,7 +210,6 @@ submit_job() {
 # ── Track all job IDs per stage for provenance dependency ────────────
 ALL_MRIQC_JOBS=""
 ALL_STRUCT_JOBS=""
-ALL_DIFF_JOBS=""
 ALL_FMRIPREP_JOBS=""
 ALL_XCPD_JOBS=""
 
@@ -233,7 +229,6 @@ while IFS='|' read -r SUBJECT BIDS_SUBDIR; do
 
     SUBJ_MRIQC_JOB=""
     SUBJ_STRUCT_JOB=""
-    SUBJ_DIFF_JOB=""
     SUBJ_FMRIPREP_JOB=""
     SUBJ_XCPD_JOB=""
 
@@ -313,18 +308,11 @@ bash "${SCRIPTS_DIR}/structural_preprocessing.sh" "${SUBJECT}" "${BIDS_SUBDIR}"
 # ── Copy finals from EPHEMERAL → HOME ──────────────────────────────
 SRC="${EPHEMERAL_DERIV}/structural/sub-${SUBJECT}/${SESSION}"
 DST="${DERIV_DIR}/structural/sub-${SUBJECT}/${SESSION}"
-mkdir -p "\$DST/fast" "\$DST/first" "\$DST/sienax" "\$DST/qc"
+mkdir -p "\$DST"
 
-for f in T1w_brain.nii.gz T1w_brain_mask.nii.gz \
-         T1w2MNI_warp.nii.gz MNI2T1w_warp.nii.gz T1w2MNI.mat \
-         FLAIR_to_T1w.nii.gz FLAIR2T1w.mat provenance.json; do
+for f in provenance.json; do
     [ -f "\$SRC/\$f" ] && cp "\$SRC/\$f" "\$DST/"
 done
-cp "\$SRC"/fast/T1w_pve_*.nii.gz "\$DST/fast/" 2>/dev/null || true
-cp "\$SRC"/fast/T1w_seg.nii.gz "\$DST/fast/" 2>/dev/null || true
-cp "\$SRC"/first/*.nii.gz "\$DST/first/" 2>/dev/null || true
-cp "\$SRC"/sienax/report.sienax "\$DST/sienax/" 2>/dev/null || true
-cp "\$SRC"/qc/*.png "\$DST/qc/" 2>/dev/null || true
 
 # FreeSurfer — copy only essential files to HOME (stats + surfaces for QC)
 # Full recon stays on ephemeral (fMRIPrep reads it from there)
@@ -343,99 +331,12 @@ if [ -d "\$FS_SRC" ]; then
 fi
 
 # NOTE: do NOT rm structural or FreeSurfer from ephemeral —
-# diffusion needs structural for T1 registration, fMRIPrep needs FreeSurfer
+# fMRIPrep needs FreeSurfer
 
 echo "[\$(date)] Structural COMPLETE — finals on Home (~\$(du -sh "\$DST" 2>/dev/null | cut -f1))"
 PBSEOF
         SUBJ_STRUCT_JOB=$(submit_job "$STRUCT_SCRIPT" "$SUBJ_MRIQC_JOB")
         ALL_STRUCT_JOBS="${ALL_STRUCT_JOBS:+${ALL_STRUCT_JOBS}:}${SUBJ_STRUCT_JOB}"
-    fi
-
-    # ==================================================================
-    # Diffusion (GPU)
-    # ==================================================================
-    if [[ "$STEPS" == "all" || "$STEPS" == *"diff"* ]]; then
-        # Check if DWI data exists before creating job
-        DWI_DIR="${BIDS_ROOT}/${BIDS_SUBDIR}/sub-${SUBJECT}/${SESSION}/dwi"
-        if [ -d "$DWI_DIR" ] && [ -n "$(find "$DWI_DIR" -name "*_dwi.nii.gz" 2>/dev/null | head -1)" ]; then
-            DIFF_SCRIPT="$LOGS_DIR/job_diff_${SUBJECT}.pbs"
-            cat > "$DIFF_SCRIPT" << PBSEOF
-#!/bin/bash
-#PBS -N diff_${SUBJECT}
-#PBS -l walltime=12:00:00
-#PBS -l select=1:ncpus=8:mem=24gb
-#PBS -q v1_medium72
-#PBS -o ${LOGS_DIR}/diff_${SUBJECT}_${SESSION}.out
-#PBS -e ${LOGS_DIR}/diff_${SUBJECT}_${SESSION}.err
-
-module load tools/prod
-module load ANTs/2.3.5-foss-2021a
-module load MRtrix/3.0.4-foss-2022b
-module load FSL/6.0.7.17
-unset PYTHONPATH 2>/dev/null || true
-export LD_LIBRARY_PATH=\$(echo "\$LD_LIBRARY_PATH" | tr ':' '\n' | grep -v MCR | tr '\n' ':' | sed 's/:\$//')
-source \$FSLDIR/etc/fslconf/fsl.sh 2>/dev/null || true
-
-# Fail loudly on any downstream error (including missing preproc script).
-set -euo pipefail
-
-export BIDS_ROOT="${BIDS_ROOT}"
-export DERIV_DIR="${EPHEMERAL_DERIV}"
-export CLEANUP_INTERMEDIATES=true
-export SESSION="${SESSION}"
-
-# Structural output should already be on ephemeral from the preceding job.
-# If not (e.g. re-running diffusion alone), symlink from HOME.
-STRUCT_EPH="${EPHEMERAL_DERIV}/structural/sub-${SUBJECT}"
-STRUCT_HOME="${DERIV_DIR}/structural/sub-${SUBJECT}"
-if [ ! -d "\$STRUCT_EPH" ] && [ -d "\$STRUCT_HOME" ]; then
-    mkdir -p "${EPHEMERAL_DERIV}/structural"
-    ln -sf "\$STRUCT_HOME" "\$STRUCT_EPH"
-    echo "  Symlinked structural from HOME → ephemeral"
-fi
-
-echo "[\$(date)] Diffusion for sub-${SUBJECT} (GPU, ephemeral)"
-# Hard-fail if preproc script is missing rather than silently printing "COMPLETE".
-PREPROC_SCRIPT="${SCRIPTS_DIR}/03_diffusion_preproc.sh"
-if [ ! -f "\$PREPROC_SCRIPT" ]; then
-    echo "ERROR: diffusion preprocessing script not found at \$PREPROC_SCRIPT" >&2
-    exit 1
-fi
-bash "\$PREPROC_SCRIPT" "${SUBJECT}" "${BIDS_SUBDIR}"
-
-# ── Copy lightweight finals from EPHEMERAL → HOME ────────────────
-# Skip dwi_preprocessed.nii.gz (4D, ~400MB) — stays on ephemeral
-# Only copy MNI scalar maps, dtifit, registrations, provenance
-SRC="${EPHEMERAL_DERIV}/diffusion/sub-${SUBJECT}/${SESSION}"
-DST="${DERIV_DIR}/diffusion/sub-${SUBJECT}/${SESSION}"
-mkdir -p "\$DST/dtifit" "\$DST/qc"
-
-for f in FA_MNI.nii.gz MD_MNI.nii.gz RD_MNI.nii.gz AD_MNI.nii.gz FA2T1.nii.gz \
-         b0_brain.nii.gz b0_brain_mask.nii.gz \
-         b0toT1_0GenericAffine.mat FA2T1.mat FA2MNI_warp.nii.gz \
-         provenance.json; do
-    [ -f "\$SRC/\$f" ] && cp "\$SRC/\$f" "\$DST/"
-done
-# Preprocessed bval/bvec (tiny) but NOT the 4D nifti
-cp "\$SRC"/dwi_preprocessed.bval "\$DST/" 2>/dev/null || true
-cp "\$SRC"/dwi_preprocessed.bvec "\$DST/" 2>/dev/null || true
-# dtifit scalar maps only (skip tensor)
-cp "\$SRC"/dtifit/dti_FA.nii.gz "\$DST/dtifit/" 2>/dev/null || true
-cp "\$SRC"/dtifit/dti_MD.nii.gz "\$DST/dtifit/" 2>/dev/null || true
-cp "\$SRC"/dtifit/dti_RD.nii.gz "\$DST/dtifit/" 2>/dev/null || true
-cp "\$SRC"/qc/* "\$DST/qc/" 2>/dev/null || true
-
-# Keep full diffusion on ephemeral (tractography may need it later)
-# To reclaim space later: rm -rf ${EPHEMERAL_DERIV}/diffusion/
-[ -L "\$STRUCT_EPH" ] && rm -f "\$STRUCT_EPH"
-
-echo "[\$(date)] Diffusion COMPLETE — finals on Home (~\$(du -sh "\$DST" 2>/dev/null | cut -f1))"
-PBSEOF
-            SUBJ_DIFF_JOB=$(submit_job "$DIFF_SCRIPT" "$SUBJ_STRUCT_JOB")
-            ALL_DIFF_JOBS="${ALL_DIFF_JOBS:+${ALL_DIFF_JOBS}:}${SUBJ_DIFF_JOB}"
-        else
-            echo "  (no DWI data — skipping diffusion)"
-        fi
     fi
 
     # ==================================================================
@@ -649,12 +550,9 @@ du -sh "${EPHEMERAL_DERIV}"/* 2>/dev/null || echo "  (clean)"
 echo ""
 quota -s 2>/dev/null | head -10 || true
 PBSEOF
-    # Provenance depends on the last jobs from diff + xcpd
+    # Provenance depends on the last jobs from xcpd
     PROV_DEP=""
     # Collect all final-stage job IDs
-    if [ -n "$ALL_DIFF_JOBS" ]; then
-        PROV_DEP="$ALL_DIFF_JOBS"
-    fi
     if [ -n "$ALL_XCPD_JOBS" ]; then
         PROV_DEP="${PROV_DEP:+${PROV_DEP}:}${ALL_XCPD_JOBS}"
     fi
@@ -668,16 +566,15 @@ echo "JOB SUBMISSION SUMMARY"
 echo "============================================"
 echo "Subjects:     $N_SUBJ"
 echo ""
-echo "Jobs per subject: MRIQC → Structural → Diffusion (GPU)"
-echo "                                     → fMRIPrep → XCP-D"
+echo "Jobs per subject: MRIQC → Structural → fMRIPrep → XCP-D"
 echo "Final job:        Provenance (after all complete)"
 echo ""
 echo "Storage plan:"
-echo "  Home (finals):     ~5.75 GB/subject × $N_SUBJ = ~$((N_SUBJ * 6)) GB"
+echo "  Home (finals):     ~5 GB/subject × $N_SUBJ = ~$((N_SUBJ * 5)) GB"
 echo "  Ephemeral (temp):  cleaned after each subject"
 echo ""
-N_JOBS=$((N_SUBJ * 5 + 1))
-echo "Total jobs submitted: ~${N_JOBS} (5 per subject + 1 provenance)"
+N_JOBS=$((N_SUBJ * 4 + 1))
+echo "Total jobs submitted: ~${N_JOBS} (4 per subject + 1 provenance)"
 echo ""
 echo "Monitor:  module purge && qstat -u $USER"
 echo "Logs:     $LOGS_DIR/"

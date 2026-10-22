@@ -112,34 +112,6 @@ def classify_sequence(seq_name: str):
     return None
 
 
-def load_ida_search(zip_dir: Path) -> dict:
-    """Load idaSearch CSV and return metadata keyed by (SubjectID, ImageID)."""
-    meta = {}
-    for csv_file in sorted(zip_dir.glob("idaSearch*.csv")):
-        log.info(f"Reading metadata CSV: {csv_file.name}")
-        # Copy to /tmp to avoid Google Drive streaming hangs
-        tmp_csv = Path(tempfile.gettempdir()) / csv_file.name
-        shutil.copy2(csv_file, tmp_csv)
-        with open(tmp_csv, "r", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                sid = row.get("Subject ID", "").strip().strip('"')
-                iid = row.get("Image ID", "").strip().strip('"')
-                if sid and iid:
-                    meta[(sid, iid)] = {
-                        "sex": row.get("Sex", "").strip().strip('"'),
-                        "age": row.get("Age", "").strip().strip('"'),
-                        "group": row.get("Research Group", "").strip().strip('"'),
-                        "visit": row.get("Visit", "").strip().strip('"'),
-                        "modality": row.get("Modality", "").strip().strip('"'),
-                        "description": row.get("Description", "").strip().strip('"'),
-                        "protocol": row.get("Imaging Protocol", "").strip().strip('"'),
-                    }
-        tmp_csv.unlink(missing_ok=True)
-    log.info(f"Loaded {len(meta)} scan entries from idaSearch CSVs")
-    return meta
-
-
 def discover_extracted_dicoms(zip_dir: Path, subject_filter: str = None) -> dict:
     """Discover DICOM directories from pre-extracted directory trees.
     Uses `find` for fast bulk discovery on Google Drive (avoids slow per-dir Python I/O).

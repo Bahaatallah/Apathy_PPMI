@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Role: Circos helpers with atlas-derived parcel labels (atlas_4S256Parcels_labels.tsv, given
 #     with --atlas-labels); no hard-coded label list.
-# Manuscript item: Figure 3 and Supplementary Figure S4 (chord panels).
+# Manuscript item: Figure 3 (chord panels).
 """circos_helpers.py: chord-diagram helpers for the NBS figures.
 
 All 256 parcels of the 4S256Parcels atlas are arranged around the ring by network (Schaefer-200
@@ -12,13 +12,10 @@ drawn as bezier curves (red, positive; blue, negative). draw_circos checks that 
 matches the component's recorded n_edges, that labels do not overlap or touch the ring and that
 leader lines do not cross, and returns what was drawn; audit_texts checks printed font sizes.
 
-Usage (stand-alone chord panels; the manuscript figures are made by figure3_connectivity_components.py):
-    python3 circos_helpers.py --nbs-dir <fc_connectome_continuous> \
-        --fig-dir <out> --atlas-labels <atlas_4S256Parcels_labels.tsv>
+Imported by figure3_connectivity_components.py, which draws the manuscript figure.
 """
 from __future__ import annotations
 
-import argparse
 import itertools
 import json
 import re
@@ -235,7 +232,7 @@ def load_significant_components(json_path: Path, p_thresh: float = 0.05):
                 if "edges" not in comp:
                     raise KeyError(
                         f"{Path(json_path).name}: component lacks an 'edges' "
-                        "list (pre-2026-07-08 NBS export). Re-run the "
+                        "list (older NBS export without an edge list). Re-run the "
                         "NBS extraction so each component records its "
                         "supra-threshold edges; do not reconstruct "
                         "them from the node list.")
@@ -451,7 +448,7 @@ def draw_circos(ax, angles, net_arcs, net_of_idx, labels,
     edges_drawn = []
     for ci, (sign, nodes, edges, n_edges, p) in enumerate(sig_components):
         # Guard: refuse to draw anything but the true edge
-        # list. A clique over the component's nodes (the pre-2026-07-08
+        # list. A clique over the component's nodes (the older
         # bug) or any stale edge list fails loudly here.
         if len(edges) != n_edges:
             raise ValueError(
@@ -622,72 +619,3 @@ def audit_texts(fig, texts, min_pt: float = 6.0, pad_px: float = 0.0):
             problems.append(f"overlap: {a.get_text()!r} / {b.get_text()!r}")
     return problems
 
-
-def main():
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--nbs-dir", required=True)
-    p.add_argument("--fig-dir", required=True)
-    p.add_argument("--atlas-labels", required=True,
-                   help="4S256Parcels labels: index/label table, XCP-D "
-                        "timeseries/relmat TSV, or a directory of them")
-    p.add_argument("--p-thresh", type=float, default=0.05)
-    p.add_argument("--contrasts", nargs="*", default=None,
-                   help="Ordered list of contrast names to plot "
-                        "(default: auto-discover, skip SKIP_CONTRASTS)")
-    p.add_argument("--out-name", default="nbs_circos_panel",
-                   help="Output filename stem (default: nbs_circos_panel)")
-    args = p.parse_args()
-
-    nbs_dir = Path(args.nbs_dir)
-    out_dir = Path(args.fig_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    plt.rcParams["font.family"] = ["Arial", "DejaVu Sans"]
-    labels = get_labels(args.atlas_labels)
-    n_checked = check_labels_against_decoded(nbs_dir, labels)
-    print(f"  {len(labels)} atlas labels; {n_checked} decoder index:label "
-          "pairs agree")
-    angles, net_arcs, net_of_idx = _build_parcel_layout(labels)
-
-    all_contrast_files = {}
-    for jp in sorted(nbs_dir.glob("nbs_*.json")):
-        cname = json.load(open(jp)).get("contrast")
-        if cname is not None:
-            all_contrast_files[cname] = jp
-    if args.contrasts:
-        contrast_files = [(c, all_contrast_files[c]) for c in args.contrasts
-                          if c in all_contrast_files]
-    else:
-        contrast_files = [(c, q) for c, q in all_contrast_files.items()
-                          if c not in SKIP_CONTRASTS]
-    contrast_data = {c: load_significant_components(q, args.p_thresh)[1]
-                     for c, q in contrast_files}
-
-    # One 70 x 62 mm panel per contrast, authored at print size.
-    panel_w, panel_h, R_mm = 70.0, 62.0, 16.0
-    n_panels = len(contrast_data)
-    fig = plt.figure(figsize=(n_panels * panel_w / 25.4, panel_h / 25.4),
-                     dpi=300)
-    for k, (cname, _) in enumerate(contrast_files):
-        ax = fig.add_axes([k / n_panels, 0.0, 1.0 / n_panels, 0.86])
-        w_u = panel_w / R_mm / 2
-        h_u = 0.86 * panel_h / R_mm / 2
-        ax.set_xlim(-w_u, w_u)
-        ax.set_ylim(-h_u, h_u)
-        comps = contrast_data[cname]
-        parts = [f"{'+' if s == 'pos' else chr(0x2212)}{ne}e / {len(nd)}n "
-                 f"(p={pv:.3f})" for s, nd, ed, ne, pv in comps]
-        draw_circos(ax, angles, net_arcs, net_of_idx, labels, comps, "")
-        fig.text((k + 0.5) / n_panels, 0.97,
-                 CONTRAST_TITLES.get(cname, cname) + "\n" +
-                 ("\n".join(parts) if parts else "(no significant components)"),
-                 ha="center", va="top", fontsize=7, fontweight="bold")
-    fig.savefig(out_dir / f"{args.out_name}.png", dpi=300, facecolor="white")
-    fig.savefig(out_dir / f"{args.out_name}.pdf", facecolor="white")
-    plt.close(fig)
-    print(f"\nSaved: {args.out_name}.png/.pdf in {out_dir}")
-
-
-if __name__ == "__main__":
-    main()

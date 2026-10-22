@@ -1,6 +1,6 @@
 # Apathy, impulse-control behaviours and cognitive decline in Parkinson's disease: analysis code
 
-Code for the main analyses and figures of *Apathy marks brain network and genetic vulnerability to cognitive decline in Parkinson's disease* (Parkinson's Precision Medicine Initiative cohort; primary connectivity sample N = 305). Scripts for the supplementary analyses are available from the corresponding author on request. No participant-level data are included.
+Code for the analyses and figures of *Apathy marks brain network and genetic vulnerability to cognitive decline in Parkinson's disease* (Parkinson's Precision Medicine Initiative cohort; primary connectivity sample N = 305). The repository holds only the code behind the reported results; scripts for the supplementary analyses are available from the corresponding author on request. No participant-level data are included.
 
 Repository: https://github.com/Bahaatallah/Apathy_PPMI (release v1.0.0: https://github.com/Bahaatallah/Apathy_PPMI/releases/tag/v1.0.0). Licence: MIT (`LICENSE`). Citation metadata: `CITATION.cff`.
 
@@ -8,23 +8,22 @@ Repository: https://github.com/Bahaatallah/Apathy_PPMI (release v1.0.0: https://
 
 ```
 behavioural/                         clinical, cognitive and genetic analyses (MATLAB, R)
-  cognition_bifactor_cfa.R           bifactor measurement model of global cognition (g)
-  cohort_phenotyping.m               cohort, apathy and ICB phenotyping, four groups, longitudinal tables
+  cognition_bifactor_cfa.R           bifactor measurement model of global cognition (g), reliability and longitudinal invariance
+  cohort_phenotyping.m               cohort, apathy and ICB phenotyping, four groups, long-format modelling tables
   figure1_cohort_characterisation.m  Figure 1, Table 1, Supplementary Figure S2 and Table S1
-  figure2_cognitive_trajectories.m   Figure 2, linear mixed-effects models of cognitive decline
+  figure2_cognitive_trajectories.m   Figure 2, linear mixed-effects models of cognitive decline and their sensitivity refits
   figure5_genetic_moderation.m       Figure 5, genetic moderation models
 imaging/
-  preprocessing/                     DICOM to BIDS, MRIQC, structural, fMRIPrep and XCP-D (cluster)
-    config.py                        paths and settings
+  preprocessing/                     DICOM to BIDS, MRIQC, FreeSurfer, fMRIPrep and XCP-D (cluster)
+    config.py                        paths
     dicom_to_bids.py                 DICOM to BIDS conversion
     setup_hpc.sh                     containers and folders (run once)
     submit_pipeline.sh               per-participant job chain
-    structural_preprocessing.sh      structural stream called by submit_pipeline.sh
+    structural_preprocessing.sh      T1w preparation and FreeSurfer recon-all (structural job)
     select_runs_by_length.py         fMRIPrep bids-filter files selecting the longest task-free run
   connectivity/                      Network-Based Statistic and Figure 3 (Python)
     nbs_group_analysis.py            NBS: edge-wise GLM, residualised-regressor permutation, component FWE
-    group_covariates.py              covariate loader imported by nbs_group_analysis.py
-    extract_component_features.py    per-participant component features
+    extract_component_features.py    per-participant component features (mean FC over supra-threshold edges)
     figure3_connectivity_components.py  Figure 3 (surface maps and chord diagrams)
     circos_helpers.py                chord-diagram helpers imported by the Figure 3 script
     atlas_4S256Parcels_labels.tsv    parcel-order label table of the 4S256Parcels atlas
@@ -36,7 +35,7 @@ imaging/
 
 ## Software
 
-MATLAB R2024b with the Statistics and Machine Learning Toolbox; R 4.1.1 (lavaan, semTools, semPlot, dplyr, readr, tidyr, readxl, ggplot2, patchwork, corrplot); Python 3 (numpy, scipy, pandas; for Figure 3 also matplotlib, nibabel, nilearn with the Schaefer-2018 and fsaverage5 data, Pillow); dcm2niix; MRIQC 24.0.2, fMRIPrep 25.2.5 and XCP-D 26.0.1 containers; FSL 6.0.7.17, FreeSurfer 7.4.1, ANTs 2.3.5; a PBS Pro cluster.
+MATLAB R2024b with the Statistics and Machine Learning Toolbox; R 4.1.1 (lavaan, dplyr, readr, readxl); Python 3 (numpy, scipy, pandas; for Figure 3 also matplotlib, nibabel, nilearn with the Schaefer-2018 and fsaverage5 data, Pillow); dcm2niix; MRIQC 24.0.2, fMRIPrep 25.2.5 and XCP-D 26.0.1 containers; FSL 6.0.7.17, FreeSurfer 7.4.1, ANTs 2.3.5; a PBS Pro cluster.
 
 ## Configuration
 
@@ -48,7 +47,7 @@ Behavioural analyses:
 
 1. `Rscript behavioural/cognition_bifactor_cfa.R`, then copy `ppmi_data/MATLAB_Results/cfa_factor_scores.csv` to `revision/figures/regenerated/` (the output folder of step 2).
 2. MATLAB, with `behavioural/` and `imaging/connectivity_outcomes/` on the path: `cohort_phenotyping`, then `delete(findall(groot,'Type','figure')); save('master_workspace.mat','-v7.3')`.
-3. MATLAB, one fresh session per script on the loaded workspace: `FIG_SUPPRESS_ID_EXPORTS = true; figure1_cohort_characterisation`, then `figure2_cognitive_trajectories`, then `figure5_genetic_moderation`.
+3. MATLAB, one fresh session per script on the loaded workspace: `figure1_cohort_characterisation`, then `figure2_cognitive_trajectories`, then `figure5_genetic_moderation`.
 
 Imaging preprocessing (cluster):
 
@@ -57,13 +56,13 @@ Imaging preprocessing (cluster):
 
 Connectivity:
 
-6. `DERIV_DIR=<derivatives> GROUP_DIR=<run> python3 imaging/connectivity/nbs_group_analysis.py --analysis connectome_continuous --nperm 10000 --t-thresh 3.1 --subjects-file <design roster> --covariates <covariate table> --fmriprep-root /nonexistent_neutralized`.
+6. `DERIV_DIR=<derivatives> GROUP_DIR=<run> python3 imaging/connectivity/nbs_group_analysis.py --analysis connectome_continuous --nperm 10000 --t-thresh 3.1 --subjects-file <design roster> --covariates <covariate table> --fmriprep-root /nonexistent_neutralized`. The nested covariate models of the Supplement add `--include-extended --extended-covs <list>`, the binary-QUIP model `--quip-binary`.
 7. `python3 imaging/connectivity/extract_component_features.py --nbs-dir <run>/fc_connectome_continuous --covariates <covariate table>`; place the output with `nbs_edge_strengths.csv` in one feature folder.
 8. `python3 imaging/connectivity/figure3_connectivity_components.py --nbs-dir <run>/fc_connectome_continuous --atlas-labels imaging/connectivity/atlas_4S256Parcels_labels.tsv --fig-dir <out> --contrasts main_apathy diff_apathy_gt_quip interaction_apathyxquip --out-name Figure3`.
 
 Connectivity to outcomes:
 
-9. MATLAB on the loaded workspace: `outputDir = '<fig4>'; EXT_FC_DIR = '<features>'; EXT_FEATURE_SET = 'P305'; EXT_MEDIATOR = 'diff'; fc_cognitive_slope_mediation; fc_structural_correlates`, then `figure4_connectivity_outcomes('<features>', '<fig4>', '<slopes csv>', '<out stem>')`.
+9. MATLAB on the loaded workspace: `outputDir = '<fig4>'; EXT_FC_DIR = '<features>'; EXT_FEATURE_SET = 'P305'; EXT_MEDIATOR = 'diff'; fc_cognitive_slope_mediation; fc_structural_correlates`, then `figure4_connectivity_outcomes('<features>', '<fig4>', '<fig4>/participant_slopes_g.csv', '<out stem>')`. `EXT_FEATURE_SET = 'X343'` repeats the chain on the extended sample.
 
 Output file names inside the scripts (for example `Fig3_Genetics_Motivation_Cognition` for Figure 5) are those of the manuscript's figure files.
 
@@ -72,11 +71,10 @@ Output file names inside the scripts (for example `Fig3_Genetics_Motivation_Cogn
 - **Covariate table**: one row per participant with `subject_id, group, age, sex, site, TIV, mean_FD, education_years, disease_duration_months, updrs_iii_off, ledd, moca, apathy_composite, depression_factor, quip, hoehn_yahr, scanner_model, handedness`. Demographics, site and baseline scores from the curated cut; TIV is FreeSurfer eTIV; `mean_FD` is the mean framewise displacement of the XCP-D motion file of the analysed run.
 - **Design roster**: lines `sub-<id>|<group>` (group = BIDS folder) for the participants with a usable baseline task-free run on the conventional echo-planar protocol (200 to 260 volumes, TR of at least 2.0 s), complete covariates and adequate parcel coverage (parcels missing in more than 10% of participants blanked for everyone, 241 of 256 nodes kept; participants with more than 50 missing parcels excluded).
 - **All-pairs features** `nbs_edge_strengths.csv`: per participant, the mean Fisher-z over all node pairs of each FWE-significant component (`<contrast>_<sign>_comp<k>_mean_fc`) plus the covariate columns.
-- **Participant slopes** (`subject_id, slope_g`): the change in g per year of each participant, the fixed time effect plus the participant's random slope from the reduced LME of `fc_cognitive_slope_mediation.m` section 2.
 - **Structural tables** (baseline and 24 months): one row per participant with FreeSurfer aseg volumes (`fs_vol_*`), aparc volumes and thickness (`fs_lh_*`, `fs_rh_*`) and eTIV (`fs_EstimatedTotalIntraCranialVol`) from the outputs of `structural_preprocessing.sh`.
 - **Atlas label table** (included): `index, label, hemisphere, atlas_block` in the parcel order of the XCP-D 4S256Parcels outputs; any 4S256Parcels relmat or timeseries TSV can be passed to `--atlas-labels` instead.
 
-Outputs of these scripts carry participant identifiers (rosters, feature and slope tables, `figure1_cohort_characterisation.m` exports without `FIG_SUPPRESS_ID_EXPORTS`) and must not be redistributed.
+Outputs of these scripts carry participant identifiers (rosters, feature and slope tables) and must not be redistributed.
 
 ## Data access
 

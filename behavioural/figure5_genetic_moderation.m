@@ -27,7 +27,7 @@
 %    - Trajectory visualisation uses within-subject error correction
 %      (Loftus & Masson 1994, Morey 2008), with Gaussian smoothing
 %
-%  Dependencies: safeCol, exportFigure, formatAxis, pToStars, COL, THRESH
+%  Dependencies: safeCol, exportFigure, formatAxis, COL, THRESH
 %  =========================================================================
 
 fprintf('\n%s\n', repmat('=',1,72));
@@ -55,14 +55,14 @@ COG_VAR_LABEL = sprintf('%s (z)', COG_VAR);
 %   'binary'     - apathy_composite >= THRESH.apathy_comp (apathy_bin).
 %                  Beta = effect of being above clinical threshold.
 %
-% NOTE: visualisation strata (panel i, supplementary) always use the
+% NOTE: visualisation strata (panel i) always use the
 % binary split for interpretability — only the LME models are affected.
 if exist('APATHY_MODE_OVERRIDE', 'var'), APATHY_MODE = APATHY_MODE_OVERRIDE; else, APATHY_MODE = 'continuous'; end   % 'baseline' = Year 0 apathy and ICB z (bl_apathy_z, bl_icb_z), the primary-model design
 
 fprintf('  Cognitive DV : %s  (z-scored -> Tg.cog_z)\n', COG_VAR);
 fprintf('  Apathy mode  : %s\n\n', APATHY_MODE);
 
-%% ====  REVISED PALETTE + LEGEND STYLE (R1.10)  ==========================
+%% ====  PALETTE + LEGEND STYLE  ==========================================
 %  Deterministic colour-blind-safe palette, identical across the revised
 %  figure scripts. Overrides the workspace COL from the master script so
 %  run order cannot reintroduce the old colours.
@@ -145,7 +145,7 @@ ap_cont = double(safeCol(Tg, 'apathy_composite'));
 Tg.apathy_bin = double(ap_cont >= THRESH.apathy_comp); Tg.apathy_bin(isnan(ap_cont)) = NaN;
 bl_g.apathy_bin = Tg.apathy_bin(firstIdx);
 
-% --- trajectory strata (panel i, supplementary all-genes figure)
+% --- trajectory strata (panel i)
 %     by BASELINE (Year 0) apathy status, broadcast to every visit row, so
 %     that participants are counted once and the caption ('baseline apathy
 %     status') is true. STRATA_MODE = 'visit' restores the per-visit split.
@@ -181,7 +181,7 @@ Tg.apathy_z = zscore_safe(double(safeCol(Tg, 'apathy_composite')));
 fprintf('    DV (%s) non-missing: %d / %d rows\n', COG_VAR, sum(~isnan(Tg.cog_z)), height(Tg));
 
 % Pick which apathy column the LME models use (set above by APATHY_MODE).
-% apathy_bin is always built (panel-i strata + supp use it for display).
+% apathy_bin is always built (the panel i strata use it for display).
 switch lower(APATHY_MODE)
     case 'continuous', apathy_col_lme = 'apathy_z';
     case 'binary',     apathy_col_lme = 'apathy_bin';
@@ -269,11 +269,6 @@ fprintf('    Valid groups (n>=%d): %s\n', MIN_N, strjoin(validGenes, ', '));
 years = 0:max(Tg.year_num);
 nYrs = numel(years);
 
-% If you want to plot years since diagnosis instead and use the
-% pltdiseaseTrj function
-% Tg.ysd_bin = floor(Tg.duration_yrs);   
-% years = unique(Tg.ysd_bin(~isnan(Tg.ysd_bin)));
-% years = sort(years);
 
 % --- Gaussian smoothing setup ---
 GAUSS_BW = 0.20;
@@ -281,7 +276,7 @@ gauss_sigma = GAUSS_BW * max(years);
 smoothTraj = @(yrs, vals) gaussSmooth(yrs, vals, gauss_sigma);
 
 % --- Colours ---
-% REVISED (R1.10): Okabe-Ito subgroup palette. Positional mapping for the
+% Okabe-Ito subgroup palette. Positional mapping for the
 % five groups present in the submitted figure (validGenes = Sporadic then
 % alphabetical): Sporadic, GBA, LRRK2, PRKN/PINK1, SNCA. The old palette
 % paired orange-red (GBA), yellow-green (PRKN/PINK1), and dark red (SNCA):
@@ -525,8 +520,6 @@ for gi = 1:nGG
     rowIdx = Tg.gene_subgroup == validGenes(gi);
     phG_d(gi) = plotCPTraj(ax_d, Tg, rowIdx, 'year_num', 'apathy_composite', ...
         geneColours(gi,:), nYrs, gauss_sigma);
-    % phG_d(gi) = plotDiseaseTraj(ax_d, Tg, rowIdx, 'ysd_bin', 'apathy_composite',...
-    % geneColours(gi,:), gauss_sigma);
 end
 % no per-panel legend (it sat on the GBA1 band and SNCA curve,
 % F5-18); one subgroup key for d and e is drawn below the row (after e).
@@ -1384,57 +1377,6 @@ exportFigure(fig3, fullfile(outputDir,sprintf('Fig3_Genetics_Motivation_Cognitio
 fprintf('\n    -> Fig3_Genetics_Motivation_Cognition_%s saved\n', COG_VAR);
 
 
-%% ====  SUPPLEMENTARY: ALL TRAJECTORY PANELS  ============================
-fprintf('\n[Supp] All cognitive trajectories...\n');
-nP=nGFt; nCs=min(3,nP); nRs=ceil(nP/nCs);
-figS=figure('Units','centimeters','Position',[1 1 17.4 max(5,nRs*5.5)],'Color',COL.bg);
-
-for pi=1:nP
-    gN=geneFactors_tested{pi};
-    ax=subplot(nRs,nCs,pi); set(ax,'Color',COL.bg); hold on;
-    if strcmp(gN,'APOE_e4')
-        isC=Tg.apoe4_bin==1; isNC=Tg.apoe4_bin==0;
-        vO=~isnan(Tg.apoe4_bin)&~isnan(Tg.apathy_bin_disp)&~isnan(Tg.cog_z);
-        cL='\epsilon4+'; ncL='\epsilon4-';
-    else
-        isC=Tg.gene_subgroup==string(gN); isNC=Tg.gene_subgroup=="Sporadic";
-        vO=(isC|isNC)&~isnan(Tg.apathy_bin_disp)&~isnan(Tg.cog_z);
-        cL=gN; ncL='Spo';
-    end
-    st={isNC&Tg.apathy_bin_disp==0&vO, isNC&Tg.apathy_bin_disp==1&vO, ...
-        isC&Tg.apathy_bin_disp==0&vO,  isC&Tg.apathy_bin_disp==1&vO};
-    sC=[0.65 0.65 0.65; COL.apathy; COL.icb; COL.overlap];
-    sL={'-','--','-','--'};
-    sN={[ncL '/NoAp'],[ncL '/Ap'],[cL '/NoAp'],[cL '/Ap']};
-    phS=gobjects(4,1);
-    for si=1:4
-        nSub=numel(unique(Tg.PATNO(st{si})));
-        if nSub<5, continue; end
-        phS(si)=plotCPTraj(ax, Tg, st{si}, 'year_num', 'cog_z', ...
-            sC(si,:), nYrs, gauss_sigma, sL{si});
-        sN{si}=sprintf('%s (n=%d)',sN{si},nSub);
-    end
-    yline(ax,0,'--','Color',[0.7 0.7 0.7],'LineWidth',0.5);
-    xlabel('Year','FontSize',6); ylabel(COG_VAR_LABEL,'FontSize',6,'Interpreter','none');
-    pGxY = pFDRMatrix(pi,2); pGxYA = pFDRMatrix(pi,tw_apathy);
-    subStr='';
-    if ~isnan(pGxY),  subStr=sprintf('GxY:%.3f',pGxY); end
-    if ~isnan(pGxYA), subStr=[subStr sprintf(' GxYxA:%.3f',pGxYA)]; end
-    if hasICB
-        pGxYI = pFDRMatrix(pi,tw_icb);
-        if ~isnan(pGxYI), subStr=[subStr sprintf(' GxYxI:%.3f',pGxYI)]; end
-    end
-    title(ax,gN,'FontSize',7,'FontWeight','bold','Color',COL.accent);
-    if ~isempty(subStr), subtitle(ax,['p_{FDR}: ' subStr],'FontSize',4.5,'Color',[0.4 0.4 0.4]); end
-    vph=phS(isgraphics(phS)); vn=sN(isgraphics(phS));
-    if ~isempty(vph), lg=legend(vph,vn,'Location','southwest','FontSize',LEG_FS,'Box','off'); lg.ItemTokenSize=LEG_TOKEN; end   % REVISED (R1.10): shared legend style (supplementary figure included)
-    formatAxis(ax,COL); xlim(ax,[-0.3 max(years)+0.3]);
-end
-sgtitle('Fig S: Cognitive Trajectories by Gene x Apathy','FontSize',9,'FontWeight','bold','Color',COL.accent);
-exportFigure(figS, fullfile(outputDir,sprintf('FigS_Genetics_AllTrajectories_%s',COG_VAR)));
-fprintf('    -> FigS_Genetics_AllTrajectories_%s saved\n', COG_VAR);
-
-
 %% ====  TABLES  ===========================================================
 fprintf('\n[Tables] Saving...\n');
 writetable(resultsTable, fullfile(outputDir,sprintf('Table_LME_GeneticsCognition_%s.csv',COG_VAR)));
@@ -1576,69 +1518,10 @@ function hLine = plotCPTraj(ax, Tg, rowFilter, xVar, yVar, col, nBins, sigma, li
     plot(Xm, M, '.', 'Color', col, 'MarkerSize', 6);
 end
 
-function hLine = plotDiseaseTraj(ax, Tg, rowFilter, xVar, yVar, col, sigma, lineStyle)
-
-    if nargin < 8, lineStyle = '-'; end
-    hLine = gobjects(1);
-
-    tbl = Tg(rowFilter,:);
-    xAll = tbl.(xVar);
-    yAll = double(safeCol(tbl,yVar));
-    patAll = tbl.PATNO;
-
-    uX = unique(xAll(~isnan(xAll)));
-    uX = sort(uX);
-    if numel(uX) < 2, return; end
-
-    subjects = unique(patAll);
-    nSubj = numel(subjects);
-
-    M  = nan(size(uX));
-    SE = nan(size(uX));
-    N  = nan(size(uX));
-
-    for ti = 1:numel(uX)
-        subjVals = nan(nSubj,1);
-        for si = 1:nSubj
-            sIdx = patAll == subjects(si) & xAll == uX(ti);
-            vals = yAll(sIdx);
-            vals = vals(~isnan(vals));
-            if ~isempty(vals)
-                subjVals(si) = mean(vals);
-            end
-        end
-
-        subjVals = subjVals(~isnan(subjVals));
-        N(ti) = numel(subjVals);
-
-        if N(ti) >= 2
-            M(ti)  = mean(subjVals);
-            SE(ti) = std(subjVals) / sqrt(N(ti));
-        end
-    end
-
-    validM = ~isnan(M);
-    if sum(validM) < 2, return; end
-
-    yrsD = linspace(min(uX(validM)), max(uX(validM)), 200);
-    mSmooth = gaussSmooth(yrsD, interp1(uX(validM), M(validM), yrsD, 'pchip'), sigma);
-
-    validSE = ~isnan(SE);
-    if sum(validSE) >= 2
-        seSmooth = gaussSmooth(yrsD, interp1(uX(validSE), SE(validSE), yrsD, 'linear', 'extrap'), sigma);
-        fill(ax, [yrsD fliplr(yrsD)],...
-            [(mSmooth+seSmooth) fliplr(mSmooth-seSmooth)],...
-            col, 'FaceAlpha', 0.12, 'EdgeColor', 'none');
-    end
-
-    hLine = plot(ax, yrsD, mSmooth, lineStyle, 'Color', col, 'LineWidth', 1.5);
-    plot(ax, uX(validM), M(validM), '.', 'Color', col, 'MarkerSize', 6);
-end
-
 function [lme, converged] = tryFitLME(tbl, f1, f2)
     converged = true;
-    try, lme = fitlme(tbl, f1);
-    catch, try, lme = fitlme(tbl, f2); converged = false;
+    try, lme = fitlme(tbl, f1, 'FitMethod', 'REML');
+    catch, try, lme = fitlme(tbl, f2, 'FitMethod', 'REML'); converged = false;
            catch, lme = []; converged = false; end
     end
 end
@@ -1730,15 +1613,6 @@ end
 
 
 
-
-function s = pToStars(p)
-    if isnan(p), s = ''; return; end
-    if p < 0.001, s = '***';
-    elseif p < 0.01, s = '**';
-    elseif p < 0.05, s = '*';
-    else, s = '';
-    end
-end
 
 function out = ternary(cond, a, b)
     if cond, out = a; else, out = b; end

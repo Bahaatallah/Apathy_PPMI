@@ -2,56 +2,46 @@
 # Role: Per-participant component features for the Figure 4 chain: for every FWE-significant
 #     component of an NBS output folder (imaging/connectivity/nbs_group_analysis.py), the mean Fisher-z FC over the
 #     component's edge list (<contrast>_<sign>_comp<k>_suprathresh_fc; missing relmat cells
-#     zero-filled as in the NBS engine), its PC1, and the covariate columns merged from
+#     zero-filled as in the NBS engine), its edge count, and the covariate columns merged from
 #     --covariates. Writes <nbs-dir>/nbs_suprathreshold_fc.csv.
 # Manuscript item: connectivity features of Figure 4 and of the Results on connectivity and
 #     outcomes.
 """
-extract_component_features.py — Extract per-subject FC for supra-threshold edges
-                                    across ALL NBS contrasts (not just main effects).
+Per-participant connectivity features of the significant NBS components.
 
-For each NBS contrast JSON in `nbs-dir`, this script:
-1. Reconstructs the contrast vector used by `build_continuous_design`
-2. Builds the projection-based reduced model (same as nbs_group_analysis._nbs_continuous)
-3. Residualises edges on the reduced model
-4. Computes the partial Freedman-Lane t-statistic
-5. Thresholds at |t| > t_thresh (default 3.1, same as NBS)
-6. Intersects with each significant component's node set to get the exact edges
-   that drove the NBS result
-7. Extracts per-subject mean FC and PC1 across those supra-threshold edges
+Inputs are the design_subjects.tsv, design_matrix.tsv and nbs_<contrast>.json
+files written by nbs_group_analysis.py in --nbs-dir, and each participant's
+4S256Parcels relmat for --session (default ses-BL, largest file when several
+runs exist). Matrices are Fisher-z transformed, with the diagonal and
+non-finite entries set to zero as in the NBS run.
 
-Supports: main_apathy, main_quip, interaction_apathyxquip,
-          diff_apathy_gt_quip, diff_quip_gt_apathy,
-          shared_pos, shared_neg.
+For every component with p < 0.05, the edges are taken from the edge list
+stored in its NBS JSON file. Per participant the output contains
+  <contrast>_<sign>_comp<k>_suprathresh_fc  mean Fisher-z FC over these edges
+  <contrast>_<sign>_comp<k>_n_edges         number of edges
+  whole_FC_mean_excl_apathy                 mean FC over all edges outside
+                                            the main_apathy components
+  whole_FC_mean                             mean FC over all edges
+followed by the columns of --covariates, merged on subject_id. Edge
+t-statistics are recomputed with the reduced model of _nbs_continuous in
+nbs_group_analysis.py and summarised in the edge information file.
 
-Output: nbs_suprathreshold_fc.csv with columns:
-  subject_id, group,
-  <contrast>_<sign>_comp<N>_suprathresh_fc (mean FC over supra-thresh edges),
-  <contrast>_<sign>_comp<N>_n_edges (# supra-thresh edges actually found),
-  <contrast>_<sign>_comp<N>_pc1 (subject score on first PC of edges),
-  <all covariates merged from covariates_functional.csv>
+Supported contrasts are main_apathy, main_quip, interaction_apathyxquip,
+diff_apathy_gt_quip, diff_quip_gt_apathy, shared_pos and shared_neg. The
+mirror contrasts diff_quip_gt_apathy and shared_neg give the components of
+diff_apathy_gt_quip and shared_pos with positive and negative swapped.
+--contrasts restricts the set processed.
 
-Usage (on HPC):
-    python3 extract_component_features.py
-    python3 extract_component_features.py --nbs-dir <path>
-    python3 extract_component_features.py --t-thresh 3.1
+Outputs
+  <nbs-dir>/nbs_suprathreshold_fc.csv (or --out)
+  <nbs-dir>/nbs_suprathreshold_edge_info.json
 
-Notes
------
-• "Mirror" contrasts (diff_quip_gt_apathy = -diff_apathy_gt_quip; shared_neg =
-  -shared_pos) are still processed. They identify the SAME physical edges as
-  their counterparts and produce identical per-subject FC values under a sign
-  flip; columns are emitted for completeness but are informationally redundant
-  with the non-mirror contrast.
-• The projection-based reduced model matches what _nbs_continuous does in
-  nbs_group_analysis.py exactly, so suprathresh edge sets here coincide with the NBS
-  edge sets (previous version used a simpler all-nuisance-columns model which
-  diverged from NBS t-stats for main effects).
+Usage
+  python3 extract_component_features.py --nbs-dir <path> --covariates <table>
 """
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import os
 import sys
@@ -222,12 +212,6 @@ def main():
                         "interaction_apathyxquip diff_apathy_gt_quip shared_pos'.")
     p.add_argument("--covariates", default=str(COV_FILE),
                    help="Covariates CSV to merge into the output")
-    p.add_argument("--structural-csv",
-                   default=str(HOME / "PPMI/MRI_Data/derivatives/all_structural_measures_ses-BL.csv"),
-                   help="Optional all_structural_measures_ses-BL.csv to merge "
-                        "FreeSurfer-derived atrophy covariates "
-                        "(brain_atrophy_index, fs_eTIV, fs_TotalGray, "
-                        "mean_cortical_thickness)")
     p.add_argument("--session", default="ses-BL",
                    help="Which session subdir of xcp-d to read from "
                         "(default ses-BL). CRITICAL: must match the NBS run's "
@@ -376,9 +360,7 @@ def main():
     # ── Build whole-FC specificity-control mask ──
     # Union of all apathy-circuit suprathreshold edges (pos + neg components of
     # main_apathy). whole_FC_mean_excl_apathy = per-subject mean FC over every
-    # upper-triangle edge NOT in this union — the FC analogue of
-    # whole_connectome_mean_excl_apathy in the SC pipeline. Used as a
-    # circuit-specificity covariate in downstream cognition models.
+    # upper-triangle edge NOT in this union (a circuit-specificity summary).
     apathy_edge_indices = set()
     for label, info in component_edges.items():
         if label.startswith("main_apathy_"):
@@ -390,7 +372,7 @@ def main():
         non_apathy_mask[ei] = False
 
     # ── Extract per-subject FC for supra-threshold edges ──
-    print("\nExtracting per-subject FC + PC1...")
+    print("\nExtracting per-subject FC...")
     results = []
     for i, (sid, grp) in enumerate(subjects):
         row = {"subject_id": sid, "group": grp}
@@ -398,7 +380,7 @@ def main():
         row["whole_FC_mean_excl_apathy"] = float(
             np.mean(mats_z[i, triu[0][non_apathy_mask], triu[1][non_apathy_mask]])
         )
-        # Also a global all-edges mean, parallel to the SC variable
+        # Also a global all-edges mean
         row["whole_FC_mean"] = float(
             np.mean(mats_z[i, triu[0], triu[1]])
         )
@@ -415,20 +397,6 @@ def main():
 
     df = pd.DataFrame(results)
 
-    # PC1 per component (sign-flipped so that PC1 > 0 ⇔ higher mean FC)
-    for label, info in component_edges.items():
-        edge_idx = info["edge_indices"]
-        if len(edge_idx) < 2:
-            continue
-        edge_data = mats_z[:, triu[0][edge_idx], triu[1][edge_idx]]
-        edge_std = (edge_data - edge_data.mean(axis=0)) / (edge_data.std(axis=0) + 1e-12)
-        U, S, Vt = np.linalg.svd(edge_std, full_matrices=False)
-        pc1 = U[:, 0] * S[0]
-        if np.corrcoef(pc1, edge_data.mean(axis=1))[0, 1] < 0:
-            pc1 = -pc1
-        df[f"{label}_pc1"] = pc1
-        print(f"  {label} PC1: {(S[0]**2)/(S**2).sum()*100:.1f}% variance explained")
-
     # Merge covariates
     cov = pd.read_csv(args.covariates)
     cov["subject_id"] = cov["subject_id"].astype(str).str.replace("sub-", "")
@@ -436,41 +404,6 @@ def main():
     df = df.merge(cov, on="subject_id", how="left", suffixes=("", "_cov"))
     if "group_cov" in df.columns:
         df.drop(columns=["group_cov"], inplace=True)
-
-    # Merge FreeSurfer-derived atrophy covariates from all_structural_measures
-    struct_path = Path(args.structural_csv)
-    if struct_path.is_file():
-        struct = pd.read_csv(struct_path)
-        struct["PATNO"] = struct["PATNO"].astype(str).str.replace("sub-", "")
-        # Derive brain atrophy index = BrainSegNotVent / eTIV
-        if {"fs_BrainSegNotVent", "fs_EstimatedTotalIntraCranialVol"}.issubset(struct.columns):
-            struct["brain_atrophy_index"] = (
-                struct["fs_BrainSegNotVent"]
-                / struct["fs_EstimatedTotalIntraCranialVol"]
-            )
-        # Derive mean cortical thickness across lh+rh DK regions
-        thk_cols = [c for c in struct.columns
-                    if c.startswith(("fs_lh_", "fs_rh_"))
-                    and c.endswith("_thickness")
-                    and not c.endswith("_thickstd")]
-        if thk_cols:
-            struct["mean_cortical_thickness"] = struct[thk_cols].mean(axis=1)
-        keep = ["PATNO", "brain_atrophy_index", "mean_cortical_thickness",
-                "fs_EstimatedTotalIntraCranialVol", "fs_BrainSegNotVent",
-                "fs_TotalGray", "fs_SubCortGray", "fs_Cortex"]
-        keep = [c for c in keep if c in struct.columns]
-        struct_keep = struct[keep].rename(
-            columns={"PATNO": "subject_id",
-                     "fs_EstimatedTotalIntraCranialVol": "fs_eTIV"})
-        struct_keep["subject_id"] = struct_keep["subject_id"].astype(str)
-        df = df.merge(struct_keep, on="subject_id", how="left",
-                      suffixes=("", "_struct"))
-        n_matched = df["brain_atrophy_index"].notna().sum() if "brain_atrophy_index" in df.columns else 0
-        print(f"  Merged structural atrophy covariates: "
-              f"{n_matched}/{len(df)} subjects matched")
-    else:
-        print(f"  WARN: structural CSV not found at {struct_path} — "
-              f"skipping brain_atrophy_index merge")
 
     out_path = Path(args.out) if args.out else nbs_dir / "nbs_suprathreshold_fc.csv"
     df.to_csv(out_path, index=False)
@@ -485,7 +418,7 @@ def main():
         pred = pd.to_numeric(df[predictor], errors="coerce")
         print(f"\nCorrelations with {predictor}:")
         for label in component_edges:
-            for suffix in ("_suprathresh_fc", "_pc1"):
+            for suffix in ("_suprathresh_fc",):
                 col = f"{label}{suffix}"
                 if col not in df.columns:
                     continue

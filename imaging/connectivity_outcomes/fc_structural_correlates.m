@@ -1,15 +1,16 @@
-%% =========================================================================
-%  STRUCTURAL CORRELATES — FreeSurfer volumes x FC components
-%  Source: all_structural_measures.csv (bilateral-averaged subcort vol +
-%          cortical gray matter vol).
-%  Method: UNIFORM eTIV-as-covariate — Spearman partial
-%          r | age + sex + FD + eTIV  (subcort and cortical treated identically;
-%          slope and lateralised analyses use the same covariate set).
-%          HC-normative residual correction is computed in parallel and used
-%          for the §7b sensitivity comparison only.
-%  Spearman partial via partialcorr; within-component BH FDR.
-%  Requires workspace from fc_cognitive_slope_mediation.m.
-% =========================================================================
+% Role: Connectivity-to-outcome chain, step 2 of 3 for Figure 4. Spearman partial correlations of
+%     each connectivity component with 42 bilaterally averaged FreeSurfer volumes (9 subcortical,
+%     33 cortical), adjusted for age, sex, mean FD and eTIV (M1) and in addition for education,
+%     disease duration, LEDD and MDS-UPDRS Part III (M2), with BH FDR across regions within
+%     component. Then the 24-month hippocampal atrophy rate (bilateral, left, right; volumes
+%     eTIV-corrected at both time points with a healthy-control normative model) against baseline
+%     connectivity, adjusted for age, sex, mean FD and baseline volume (M1) and in addition for
+%     education, disease duration, LEDD and MDS-UPDRS Part III (M2), with BH FDR across components
+%     within side. Writes Table_Structural_Correlates.csv, Table_Hippocampus_Slope_x_FC.csv and
+%     Table_Hippocampus_Longitudinal_Data.csv to outputDir.
+% Run: after fc_cognitive_slope_mediation.m, on the workspace it leaves.
+% Manuscript item: Figure 4b,c values (drawn by figure4_connectivity_outcomes.m); Results
+%     (structural correlates, hippocampal atrophy); the 42-region supplementary table.
 fprintf('\n[Structural] FreeSurfer volumes x FC components...\n');
 
 %% 1. Load structural measures
@@ -131,8 +132,8 @@ for si=1:nFC
     end
 end
 
-% Apply HC normative correction to subcortical volumes (SENSITIVITY only,
-% post 2026-05-06; primary now uses rawROI + eTIV-in-Z uniformly).
+% HC normative correction of the subcortical volumes (used for the hippocampal slopes in
+% section 13; the cross-sectional analysis uses rawROI with eTIV as a covariate).
 normROI = rawROI;
 for ri=1:nSub
     for si=1:nFC
@@ -142,7 +143,6 @@ for ri=1:nSub
     end
 end
 fprintf('  Primary volumes: rawROI (uncorrected); eTIV partialled in covariate set.\n');
-fprintf('  Sensitivity:     HC-normative-corrected subcortical (normROI) — see §7b.\n');
 
 %% 6. Predictors + covariates
 predData  = nan(nFC, nAllFC);
@@ -153,17 +153,9 @@ for fi=1:nAllFC
 end
 nPred = nAllFC;
 
-% Covariates — two-model sensitivity design (uniform method post 2026-05-06):
-%   M1 PRIMARY    : age + sex + FD + eTIV       (uniform across subcort + cortical)
-%   M2 SENSITIVITY: M1 + EDUC + duration + LEDD + UPDRS-3
-%
-% Rationale: switched to eTIV-as-covariate as the primary method across the
-% board (was HC-normative residual for subcortical only — see §7b for the
-% empirical comparison). This eliminates the cortical/subcortical asymmetry
-% and gives a single uniform method for all 43 ROIs. HC-normative correction
-% is retained as a parallel sensitivity (rMat_subHC in §7b).
-% age^2 was previously computed but unused (kept as ageSq for back-compat).
-ageSq  = fcMean.age .^ 2;
+% Covariates, two models:
+%   M1 (primary): age + sex + FD + eTIV, the same for subcortical and cortical ROIs
+%   M2 (sensitivity): M1 + education + disease duration + LEDD + UPDRS-III
 Z_sub  = [fcMean.age, sexFC, fcMean.mean_FD, fc_eTIV];
 Z_cort = [fcMean.age, sexFC, fcMean.mean_FD, fc_eTIV];
 
@@ -211,61 +203,8 @@ for ri=1:nROI
     end
 end
 
-%% 7b. SENSITIVITY: subcortical with HC-normative residual
-%   Recomputes subcortical correlations using normROI (HC-normative correction)
-%   while §7 primary uses rawROI + eTIV-in-Z. This is the methodological
-%   robustness check for the May 2026 switch to uniform covariate method.
-fprintf('\n  [Sensitivity §7b] Subcortical with HC-normative residual (vs primary covariate method)\n');
-Z_sub_HC = [fcMean.age, sexFC, fcMean.mean_FD];   % NO eTIV — already in normROI
-
-rMat_subHC = nan(nSub, nPred);  pMat_subHC = nan(nSub, nPred);
-for ri = 1:nSub
-    y = normROI(:,ri);   % HC-NORMATIVE-corrected subcortical volume
-    for pi = 1:nPred
-        x = predData(:,pi);
-        ok = ~isnan(x) & ~isnan(y) & all(~isnan(Z_sub_HC),2);
-        if sum(ok) < 20, continue; end
-        [rho, pval] = partialcorr(x(ok), y(ok), Z_sub_HC(ok,:), 'Type','Spearman');
-        rMat_subHC(ri,pi) = rho;  pMat_subHC(ri,pi) = pval;
-    end
-end
-
-% Side-by-side comparison for each FC component, focused on subcortical only
-fprintf('\n  Subcortical: PRIMARY (eTIV-as-covariate)  vs  SENSITIVITY (HC-normative)\n');
-maxAbsDelta_all = 0;  maxCell = '';
-for pi = 1:nPred
-    fprintf('\n  --- %s ---\n', predNames{pi});
-    fprintf('  %-15s  %8s  %8s   %8s  %8s   %8s\n', ...
-        'ROI', 'rho_cov', 'p_cov', 'rho_HC', 'p_HC', 'Δrho');
-    fprintf('  %s\n', repmat('-',1,68));
-    maxAbsDelta_pi = 0;
-    for ri = 1:nSub
-        rho_cov = rMat(ri, pi);          % PRIMARY (covariate method, from §7)
-        p_cov   = pMat(ri, pi);
-        rho_hc  = rMat_subHC(ri, pi);
-        p_hc    = pMat_subHC(ri, pi);
-        if isnan(rho_cov) && isnan(rho_hc), continue; end
-        dRho = rho_hc - rho_cov;
-        if abs(dRho) > maxAbsDelta_pi, maxAbsDelta_pi = abs(dRho); end
-        if abs(dRho) > maxAbsDelta_all
-            maxAbsDelta_all = abs(dRho);
-            maxCell = sprintf('%s × %s', subNames{ri}, predNames{pi});
-        end
-        fprintf('  %-15s  %+8.3f  %8.4f   %+8.3f  %8.4f   %+8.3f\n', ...
-            subNames{ri}, rho_cov, p_cov, rho_hc, p_hc, dRho);
-    end
-    fprintf('  Max |Δρ| (%s): %.3f\n', predNames{pi}, maxAbsDelta_pi);
-end
-fprintf('\n  Across all subcortical × FC cells: max |Δρ| = %.3f  (%s)\n', ...
-    maxAbsDelta_all, maxCell);
-fprintf('  Interpretation: methods are equivalent if |Δρ| < ~0.02 across all cells.\n');
-fprintf('  Larger divergence in any cell flags a per-region nonlinearity in the eTIV-volume\n');
-fprintf('  relationship that the covariate method may under-correct for.\n');
-
-%% 8. Within-component FDR — RH SM-DA as primary (fi=2)
-%    FDR across 43 ROIs for each FC component separately. Done within
-%    each model (M1 / M2) to keep families internally consistent. Main
-%    analysis and forest plot focus on M1 RH SM-DA (the cognitive mediator).
+%% 8. Within-component FDR
+%    BH FDR across the 42 ROIs for each FC component separately, within each model (M1, M2).
 pFDR    = nan(nROI, nPred);   % M1
 pFDR_M2 = nan(nROI, nPred);   % M2
 for pi=1:nPred
@@ -339,96 +278,6 @@ for ri=1:nROI
     end
 end
 
-%% 10. Forest plot — RH SM-DA component, compact single panel
-cSig  = [0.20 0.40 0.65];   % blue for FDR-significant
-cUnc  = [0.45 0.60 0.80];   % lighter blue for uncorrected
-cNS   = [0.78 0.78 0.78];   % gray for n.s.
-cBG   = [0.97 0.97 0.97];   % alternating row shade
-
-rhoVec = rMat(:, piSMDA);
-pVec   = pMat(:, piSMDA);
-fdrVec = pFDR(:, piSMDA);
-
-fig_f = figure('Color','w','Position',[100 80 420 max(400, 11*nROI)],'Visible','off');
-ax = axes('Parent',fig_f,'Units','normalized','Position',[0.38 0.08 0.56 0.86]);
-hold(ax,'on');
-
-for ri = 1:nROI
-    y = nROI - ri + 1;
-    rho = rhoVec(ri);
-    if isnan(rho), continue; end
-
-    isFDR = ~isnan(fdrVec(ri)) && fdrVec(ri) < 0.05;
-    isUnc = ~isnan(pVec(ri))   && pVec(ri) < 0.01;
-
-    % Alternating row shading
-    if mod(ri,2)==0
-        fill(ax, [-0.35 0.35 0.35 -0.35], [y-0.45 y-0.45 y+0.45 y+0.45], ...
-            cBG, 'EdgeColor','none','FaceAlpha',0.5);
-    end
-
-    % Horizontal line from 0 to rho (lollipop stem)
-    if isFDR
-        plot(ax, [0 rho], [y y], '-', 'Color', cSig, 'LineWidth', 1.8);
-        plot(ax, rho, y, 'o', 'MarkerSize', 8, 'MarkerFaceColor', cSig, ...
-            'MarkerEdgeColor', 'w', 'LineWidth', 0.8);
-        if rho >= 0, ha = 'left'; else, ha = 'right'; end
-        text(ax, rho + sign(rho)*0.015, y, sprintf('%.2f', rho), ...
-            'FontSize', 6, 'FontWeight', 'bold', 'Color', cSig, ...
-            'VerticalAlignment', 'middle', 'HorizontalAlignment', ha);
-    elseif isUnc
-        plot(ax, [0 rho], [y y], '-', 'Color', cUnc, 'LineWidth', 1.2);
-        plot(ax, rho, y, 'o', 'MarkerSize', 6.5, 'MarkerFaceColor', 'w', ...
-            'MarkerEdgeColor', cUnc, 'LineWidth', 1.4);
-        text(ax, rho + sign(rho)*0.015, y, sprintf('%.2f', rho), ...
-            'FontSize', 5.5, 'Color', [0.35 0.35 0.35], ...
-            'VerticalAlignment', 'middle');
-    else
-        plot(ax, [0 rho], [y y], '-', 'Color', [0.85 0.85 0.85], 'LineWidth', 0.6);
-        plot(ax, rho, y, '.', 'MarkerSize', 6, 'Color', cNS);
-    end
-end
-
-xline(ax, 0, '-', 'Color', [0.4 0.4 0.4], 'LineWidth', 0.8);
-% Subcortical / cortical separator
-yline(ax, nROI - nSub + 0.5, '-', 'Color', [0.3 0.3 0.3], 'LineWidth', 0.8);
-text(ax, -0.33, nROI - nSub/2 + 0.5, 'Subcortical', 'FontSize', 6, ...
-    'FontWeight','bold', 'Color',[0.4 0.4 0.4], 'HorizontalAlignment','center', 'Rotation', 90);
-text(ax, -0.33, (nROI - nSub)/2 + 0.5, 'Cortical', 'FontSize', 6, ...
-    'FontWeight','bold', 'Color',[0.4 0.4 0.4], 'HorizontalAlignment','center', 'Rotation', 90);
-
-% Y-axis labels with formatting
-yLabels = cell(nROI,1);
-for ri = 1:nROI
-    ori = nROI - ri + 1;
-    lbl = allNames{ori};
-    isFDR = ~isnan(fdrVec(ori)) && fdrVec(ori) < 0.05;
-    isUnc = ~isnan(pVec(ori))   && pVec(ori) < 0.01;
-    if isFDR,     yLabels{ri} = ['\bf\color[rgb]{0.20,0.40,0.65}' lbl];
-    elseif isUnc, yLabels{ri} = ['\it\color[rgb]{0.35,0.35,0.35}' lbl];
-    else,         yLabels{ri} = ['\color[rgb]{0.55,0.55,0.55}' lbl];
-    end
-end
-
-set(ax, 'YTick', 1:nROI, 'YTickLabel', yLabels, 'FontSize', 6.5, ...
-    'TickDir', 'out', 'Box', 'off', 'YLim', [0.3 nROI+0.7], ...
-    'XLim', [-0.35 0.35], 'FontName', 'Helvetica');
-xlabel(ax, 'Spearman partial \rho', 'FontSize', 9);
-title(ax, sprintf('RH Somatomotor-DorsAttn FC  \\times  Regional Volume'), ...
-    'FontSize', 10, 'FontWeight', 'bold', 'Color', cSig);
-
-% Legend
-annotation(fig_f, 'textbox', [0.40 0.01 0.55 0.05], 'String', ...
-    sprintf('\\bf\\color[rgb]{0.20,0.40,0.65}\\bullet FDR<.05 (%d)   \\rm\\color[rgb]{0.45,0.60,0.80}\\circ p<.01 (%d)   \\color[rgb]{0.6,0.6,0.6}\\cdot n.s.   |   %d ROIs tested', ...
-    nSigFDR, nSigUnc, nTests_smda), ...
-    'EdgeColor', 'none', 'FontSize', 6.5, 'HorizontalAlignment', 'center', ...
-    'VerticalAlignment', 'bottom', 'FitBoxToText', 'on');
-
-exportgraphics(fig_f, fullfile(outputDir,'Fig4_Structural_Forest.pdf'), 'ContentType','vector');
-exportgraphics(fig_f, fullfile(outputDir,'Fig4_Structural_Forest.png'), 'Resolution',300);
-fprintf('  Saved: Fig4_Structural_Forest.pdf / .png\n');
-close(fig_f);
-
 %% 11. Save table (all components, within-component FDR, both models)
 %   Long format: one row per (Model, ROI, FC) combination. Model column
 %   distinguishes M1_Primary (age+sex+FD[+eTIV]) from M2_Sensitivity
@@ -445,161 +294,6 @@ writetable(cell2table(vertcat(rows{:}), ...
     fullfile(outputDir,'Table_Structural_Correlates.csv'));
 fprintf('  Saved: Table_Structural_Correlates.csv (M1 + M2, %d rows)\n', numel(rows));
 
-%% 12. LATERALISED ANALYSIS — all L/R volumes x all FC components
-%    No bilateral averaging. Includes subcortical (fs_vol_Left/Right_*)
-%    and cortical GM volumes (fs_lh/rh_*_volume). Method (post 2026-05-06):
-%    UNIFORM eTIV-as-covariate (Z_sub = Z_cort = [age, sex, FD, eTIV]) on
-%    raw lateralised volumes (latROI). HC-normative-corrected lateralised
-%    subcortical (latROI_HC) is preserved for parallel sensitivity.
-%    FDR reported both within-component and across all components.
-fprintf('\n[12] Lateralised volumes x FC (no bilateral averaging)...\n');
-
-% --- Build lateralised subcortical ROI list ---
-latSubPairs = { ...
-    'L Hippocampus',  'fs_vol_Left_Hippocampus';  'R Hippocampus',  'fs_vol_Right_Hippocampus'; ...
-    'L Amygdala',     'fs_vol_Left_Amygdala';     'R Amygdala',     'fs_vol_Right_Amygdala'; ...
-    'L Caudate',      'fs_vol_Left_Caudate';       'R Caudate',      'fs_vol_Right_Caudate'; ...
-    'L Putamen',      'fs_vol_Left_Putamen';       'R Putamen',      'fs_vol_Right_Putamen'; ...
-    'L Accumbens',    'fs_vol_Left_Accumbens_area';'R Accumbens',    'fs_vol_Right_Accumbens_area'; ...
-    'L Thalamus',     'fs_vol_Left_Thalamus';      'R Thalamus',     'fs_vol_Right_Thalamus'; ...
-    'L Pallidum',     'fs_vol_Left_Pallidum';       'R Pallidum',     'fs_vol_Right_Pallidum'; ...
-    'L Cereb Cortex', 'fs_vol_Left_Cerebellum_Cortex'; 'R Cereb Cortex', 'fs_vol_Right_Cerebellum_Cortex'; ...
-    'Brain Stem',     'fs_vol_Brain_Stem'};
-nLatSub = size(latSubPairs,1);
-
-% HC normative beta per lateralised subcortical ROI
-hc_beta_lat = nan(nLatSub,1);
-for ri = 1:nLatSub
-    asegCol = strrep(latSubPairs{ri,2}, 'fs_vol_', '');
-    if ismember(asegCol, asegT.Properties.VariableNames)
-        hcV = double(asegT.(asegCol)(isHC));
-        ok = ~isnan(hcV) & ~isnan(hc_eTIV);
-        if sum(ok)>15, b = polyfit(hc_eTIV(ok), hcV(ok), 1); hc_beta_lat(ri) = b(1);
-        else, hc_beta_lat(ri) = 0; end
-    else
-        hc_beta_lat(ri) = 0;
-    end
-end
-
-% --- Build lateralised cortical ROI list (GM volume) ---
-latCortNames = {};
-latCortCols  = {};
-for ri = 1:nCort
-    for hemi = {'lh','rh'}
-        h = hemi{1};
-        if strcmp(h,'lh'), pre = 'L '; else, pre = 'R '; end
-        latCortNames{end+1} = [pre aparcReg{ri}]; %#ok
-        latCortCols{end+1}  = ['fs_' h '_' aparcReg{ri} '_volume']; %#ok
-    end
-end
-nLatCort = numel(latCortNames);
-nLatROI  = nLatSub + nLatCort;
-latNames = [latSubPairs(:,1); latCortNames(:)];
-fprintf('  Lateralised ROIs: %d subcort + %d cortical = %d\n', nLatSub, nLatCort, nLatROI);
-
-% --- Extract lateralised values for FC sample ---
-%   Primary uses raw volumes; eTIV is partialled via Z_sub / Z_cort which
-%   both include fc_eTIV (uniform covariate method). HC-normative variants
-%   are kept inline as latROI_HC for parallel sensitivity comparison.
-latROI    = nan(nFC, nLatROI);
-latROI_HC = nan(nFC, nLatROI);   % subcortical only; cortical = same as latROI
-for si = 1:nFC
-    if isnan(structIdx(si)), continue; end
-    idx = structIdx(si);
-    for ri = 1:nLatSub
-        col = latSubPairs{ri,2};
-        if ismember(col, structT.Properties.VariableNames)
-            raw = double(structT.(col)(idx));
-            latROI(si,ri)    = raw;                                                       % PRIMARY
-            latROI_HC(si,ri) = raw - hc_beta_lat(ri) * (fc_eTIV(si) - hc_mean_eTIV);      % SENSITIVITY
-        end
-    end
-    for ri = 1:nLatCort
-        col = latCortCols{ri};
-        if ismember(col, structT.Properties.VariableNames)
-            latROI(si, nLatSub+ri)    = double(structT.(col)(idx));
-            latROI_HC(si, nLatSub+ri) = double(structT.(col)(idx));   % cortical: same in both
-        end
-    end
-end
-
-% --- Spearman partial correlation ---
-rLat = nan(nLatROI, nPred); pLat = nan(nLatROI, nPred);
-for ri = 1:nLatROI
-    y = latROI(:,ri);
-    if ri <= nLatSub, Zuse = Z_sub; else, Zuse = Z_cort; end
-    for pi = 1:nPred
-        x = predData(:,pi);
-        ok = ~isnan(x) & ~isnan(y) & all(~isnan(Zuse),2);
-        if sum(ok)<20, continue; end
-        [rho,pval] = partialcorr(x(ok), y(ok), Zuse(ok,:), 'Type','Spearman');
-        rLat(ri,pi) = rho; pLat(ri,pi) = pval;
-    end
-end
-
-% --- FDR: within-component ---
-pFDR_lat_wc = nan(nLatROI, nPred);
-for pi = 1:nPred
-    pv = pLat(:,pi); v = ~isnan(pv);
-    [sP,sI] = sort(pv(v)); m = numel(sP);
-    adj = nan(m,1); adj(m) = sP(m);
-    for k = m-1:-1:1, adj(k) = min(adj(k+1), sP(k)*m/k); end
-    adj = min(adj,1);
-    tmp = nan(m,1); tmp(sI) = adj;
-    out = nan(nLatROI,1); out(v) = tmp;
-    pFDR_lat_wc(:,pi) = out;
-end
-
-% --- FDR: across ALL components ---
-pFDR_lat_all = nan(nLatROI, nPred);
-pFlat = pLat(:); v = ~isnan(pFlat);
-[sP,sI] = sort(pFlat(v)); m = numel(sP);
-adj = nan(m,1); adj(m) = sP(m);
-for k = m-1:-1:1, adj(k) = min(adj(k+1), sP(k)*m/k); end
-adj = min(adj,1);
-tmp = nan(m,1); tmp(sI) = adj;
-pFDR_flat = nan(size(pFlat)); pFDR_flat(v) = tmp;
-pFDR_lat_all = reshape(pFDR_flat, nLatROI, nPred);
-
-nTotal = sum(~isnan(pLat(:)));
-fprintf('  Total tests: %d\n', nTotal);
-for pi = 1:nPred
-    nWC = sum(pFDR_lat_wc(:,pi)<0.05);
-    nAll = sum(pFDR_lat_all(:,pi)<0.05);
-    fprintf('    %-25s  FDR-within: %d   FDR-across: %d   p<.01: %d\n', ...
-        predNames{pi}, nWC, nAll, sum(pLat(:,pi)<0.01));
-end
-
-% --- Print significant results ---
-fprintf('\n  Lateralised significant (FDR-within < .05 OR p_unc < .005):\n');
-fprintf('  %-25s  %-22s  %7s  %8s  %8s  %8s\n', 'ROI','FC','rho','p_unc','FDR_wc','FDR_all');
-fprintf('  %s\n', repmat('-',1,98));
-for ri = 1:nLatROI, for pi = 1:nPred
-    isFDR_wc  = ~isnan(pFDR_lat_wc(ri,pi))  && pFDR_lat_wc(ri,pi) < 0.05;
-    isFDR_all = ~isnan(pFDR_lat_all(ri,pi)) && pFDR_lat_all(ri,pi) < 0.05;
-    isUnc     = ~isnan(pLat(ri,pi)) && pLat(ri,pi) < 0.005;
-    if isFDR_wc || isFDR_all || isUnc
-        tag = '';
-        if isFDR_all, tag = ' +++ALL';
-        elseif isFDR_wc, tag = ' ++WC';
-        elseif isUnc, tag = ' *unc'; end
-        fprintf('  %-25s  %-22s  %+.3f  %.4f  %.4f  %.4f%s\n', ...
-            latNames{ri}, predNames{pi}, rLat(ri,pi), pLat(ri,pi), ...
-            pFDR_lat_wc(ri,pi), pFDR_lat_all(ri,pi), tag);
-    end
-end, end
-
-% --- Save lateralised table ---
-rows_lat = {};
-for ri = 1:nLatROI, for pi = 1:nPred
-    rows_lat{end+1} = {latNames{ri}, predNames{pi}, rLat(ri,pi), pLat(ri,pi), ...
-        pFDR_lat_wc(ri,pi), pFDR_lat_all(ri,pi)}; %#ok
-end, end
-writetable(cell2table(vertcat(rows_lat{:}), ...
-    'VariableNames',{'ROI','FC_Component','rho','p_unc','pFDR_within','pFDR_across'}), ...
-    fullfile(outputDir,'Table_Structural_Lateralised.csv'));
-fprintf('  Saved: Table_Structural_Lateralised.csv\n');
-
 %% =========================================================================
 %  13. LONGITUDINAL HIPPOCAMPUS SLOPE x FC — hypothesis-driven follow-up
 %      Motivation: Section 9 found RH SM-DA x hippocampal volume rho = +0.19
@@ -614,21 +308,18 @@ fprintf('  Saved: Table_Structural_Lateralised.csv\n');
 %      within-subject eTIV drift between scans (FreeSurfer eTIV is not
 %      perfectly stable across rescans). RAW-volume slope variants
 %      (vBL_*_raw, v24_*_raw) computed in parallel for sensitivity.
-%      Note the asymmetry vs §1-§12 cross-sectional, which use the uniform
-%      eTIV-as-covariate method — for single-timepoint volumes the two
-%      methods are statistically equivalent (§7b confirms |Δρ| ≲ 0.02);
-%      for slope outcomes they diverge because the covariate method leaves
-%      within-subject eTIV-drift noise in the slope.
-%      Spearman partial r | age + sex + FD + EDUC + BL_vol  (M1).
-%      Primary: bilateral hippocampus x 4 FC (4-test within-family BH FDR).
-%      Sensitivity: L and R separately (each own 4-test within-side FDR).
-%      Laterality motivated by preliminary results (L >> R).
+%      The cross-sectional analysis (sections 1 to 11) uses eTIV as a covariate; for the
+%      slopes the HC-normative residual is used because eTIV drifts between scans.
+%      Spearman partial r | age + sex + FD + BL_vol (M1); M2 adds education, disease
+%      duration, LEDD and UPDRS-III.
+%      The bilateral hippocampus is the primary test; left and right are examined
+%      separately, each with BH FDR across components within side.
 % =========================================================================
 fprintf('\n[13] Longitudinal hippocampus slope x FC (hypothesis-driven)...\n');
 
-%% 13.0 Defensive extraction: baselineEduc (added 2026-04-20)
-%  If fc_cognitive_slope_mediation.m was not re-run after the covCandsMap update, baselineEduc
-%  will not exist in the workspace. Pull it from Tlong inline here.
+%% 13.0 Baseline education (M2 covariate)
+%  baselineEduc is defined by fc_cognitive_slope_mediation.m; it is rebuilt from Tlong here if
+%  it is missing from the workspace.
 if ~exist('baselineEduc','var')
     baselineEduc = nan(nFC,1);
     if exist('Tlong','var') && istable(Tlong)
@@ -664,6 +355,31 @@ if ~exist('baselineEduc','var')
     end
 end
 
+% HC normative eTIV slopes for the lateralised subcortical volumes (used for the hippocampus)
+latSubPairs = { ...
+    'L Hippocampus',  'fs_vol_Left_Hippocampus';  'R Hippocampus',  'fs_vol_Right_Hippocampus'; ...
+    'L Amygdala',     'fs_vol_Left_Amygdala';     'R Amygdala',     'fs_vol_Right_Amygdala'; ...
+    'L Caudate',      'fs_vol_Left_Caudate';       'R Caudate',      'fs_vol_Right_Caudate'; ...
+    'L Putamen',      'fs_vol_Left_Putamen';       'R Putamen',      'fs_vol_Right_Putamen'; ...
+    'L Accumbens',    'fs_vol_Left_Accumbens_area';'R Accumbens',    'fs_vol_Right_Accumbens_area'; ...
+    'L Thalamus',     'fs_vol_Left_Thalamus';      'R Thalamus',     'fs_vol_Right_Thalamus'; ...
+    'L Pallidum',     'fs_vol_Left_Pallidum';       'R Pallidum',     'fs_vol_Right_Pallidum'; ...
+    'L Cereb Cortex', 'fs_vol_Left_Cerebellum_Cortex'; 'R Cereb Cortex', 'fs_vol_Right_Cerebellum_Cortex'; ...
+    'Brain Stem',     'fs_vol_Brain_Stem'};
+nLatSub = size(latSubPairs,1);
+hc_beta_lat = nan(nLatSub,1);
+for ri = 1:nLatSub
+    asegCol = strrep(latSubPairs{ri,2}, 'fs_vol_', '');
+    if ismember(asegCol, asegT.Properties.VariableNames)
+        hcV = double(asegT.(asegCol)(isHC));
+        ok = ~isnan(hcV) & ~isnan(hc_eTIV);
+        if sum(ok)>15, b = polyfit(hc_eTIV(ok), hcV(ok), 1); hc_beta_lat(ri) = b(1);
+        else, hc_beta_lat(ri) = 0; end
+    else
+        hc_beta_lat(ri) = 0;
+    end
+end
+
 %% 13.1 Load 24M follow-up
 structFile_24M = fullfile(getenv('PPMI_IMAGING_ROOT'), 'MRI_Data/derivatives/all_structural_measures_ses-24M.csv');
 structT_24M = readtable(structFile_24M);
@@ -684,17 +400,10 @@ hasBoth = ~isnan(struct24Idx) & ~isnan(structIdx);
 fprintf('  FC subjects with both BL and 24M: %d / %d\n', sum(hasBoth), nFC);
 
 %% 13.3 Extract hippocampus volumes at BL and 24M
-%   PRIMARY: HC-normative-corrected at both timepoints. The slope
-%   constructed from HC-corrected volumes implicitly removes within-subject
-%   eTIV drift between BL and 24M scans (FreeSurfer eTIV is not perfectly
-%   stable across rescans). The eTIV-as-covariate approach used uniformly
-%   in §1-§12 is statistically equivalent for SINGLE-timepoint volumes
-%   (§7b: |Δρ| ≲ 0.02) but NOT for slope outcomes — leaving within-subject
-%   eTIV drift as residual noise in the slope. So §13/§14/§15 keep the
-%   HC-normative residual as primary while §1-§12 use the uniform covariate
-%   method (cross-sectional / longitudinal asymmetry is principled, not
-%   inconsistent).
-%   SENSITIVITY: raw volumes (vBL_*_raw, v24_*_raw) retained for parallel.
+%   Volumes are HC-normative eTIV-corrected at both time points, so the slope removes the
+%   within-subject eTIV drift between the baseline and 24-month scans (the cross-sectional
+%   analysis in sections 1 to 11 uses eTIV as a covariate instead).
+%   Raw-volume variants (vBL_*_raw, v24_*_raw) are computed alongside.
 hippRow = find(strcmp(allNames,'Hippocampus'), 1);  % row 1 in bilateral ROI matrix
 vBL_bi     = normROI(:, hippRow);    % PRIMARY HC-corrected bilateral
 vBL_bi_raw = rawROI(:, hippRow);     % SENSITIVITY raw
@@ -753,20 +462,17 @@ end
 fprintf('  Primary slopes: raw (NoWinsor). Winsor copies (1/99) saved as sensitivity.\n');
 
 %% 13.4 Partial correlation: two models, each hipp x 4 FC
-%       M1 (PRIMARY):     age + sex + FD + EDUC + BL_vol
-%       M2 (SENSITIVITY): M1 + duration + LEDD + UPDRS-3
-%       Slopes from HC-normative-corrected volumes (within-subject eTIV
-%       drift implicitly removed). NO explicit eTIV-as-covariate — that
-%       would over-control and add noise (different from §1-§12 cross-
-%       sectional, which DO use eTIV-as-covariate; see §13.3 docstring).
-%       BL_vol kept as regression-to-mean control.
+%       M1 (primary): age + sex + FD + BL_vol
+%       M2 (sensitivity): M1 + education + duration + LEDD + UPDRS-III
+%       Slopes from HC-normative-corrected volumes (within-subject eTIV drift removed), so
+%       eTIV is not entered again as a covariate. BL_vol controls regression to the mean.
 hippLabels = {'Bilateral','Left','Right'};
 slopeSet   = {slope_bi, slope_L, slope_R};
 blSet      = {vBL_bi,   vBL_L,   vBL_R};
 nHipp = numel(hippLabels);
 
 modelLabels = {'M1_Primary','M2_Sensitivity'};
-modelDesc   = {'age+sex+FD+EDUC+BLvol', ...
+modelDesc   = {'age+sex+FD+BLvol', ...
                'age+sex+FD+EDUC+dur+LEDD+UPDRS3+BLvol'};
 
 rHipp        = nan(nHipp, nPred, 2);
@@ -779,7 +485,7 @@ for mi = 1:2
         y  = slopeSet{hi};
         bl = blSet{hi};
         if mi == 1
-            Zuse = [fcMean.age, sexFC, fcMean.mean_FD, baselineEduc, bl];
+            Zuse = [fcMean.age, sexFC, fcMean.mean_FD, bl];
         else
             Zuse = [fcMean.age, sexFC, fcMean.mean_FD, baselineEduc, ...
                     baselineDur, baselineLEDD, baselineUPDRS3, bl];
@@ -848,517 +554,3 @@ TlongHipp = table(fcPATNO, slope_bi, slope_L, slope_R, vBL_bi, vBL_L, vBL_R, fc_
                       'vBL_bilateral','vBL_left','vBL_right','eTIV_BL'});
 writetable(TlongHipp, fullfile(outputDir,'Table_Hippocampus_Longitudinal_Data.csv'));
 fprintf('  Saved: Table_Hippocampus_Longitudinal_Data.csv (per-subject for panel g, includes BL eTIV)\n');
-
-%% =========================================================================
-%  14. TARGETED LINEAR MODEL — Δ_region ~ BL_FC + (DAT-parity covariates)
-%      Hypothesis-driven parametric test on 2 FC components (preliminary
-%      signal): Ap(-)1 (RH SM-DA) and Diff(-)1 (Ap-dom SM-DA), each x 3
-%      hippocampus regions (bilateral, L, R) = 6 models. No FDR.
-%      Covariates (match DAT slope methodology; DAT-specific dynCovs
-%      omitted: apathy_bl, QUIP_bl, DAT_bl, dep_bl):
-%        age + sex + FD + EDUCYRS + duration + LEDD + UPDRS-3 + BL_vol.
-%      Primary uses raw (NoWinsor) slopes from §13. Winsorised copies
-%      (slope_*_winsor) are available for sensitivity analyses only.
-%      Note: Δ is scalar per subject, so (1|PATNO) would be singleton and
-%      unidentified — fitlm (OLS) is the correct collapsed form.
-% =========================================================================
-fprintf('\n[14] Targeted linear models: Delta-hippocampus ~ BL_FC (6 fits x 2 models)...\n');
-fprintf('     M1 Primary: age+sex+FD+EDUC+BLvol   |   M2 Sensitivity: +dur+LEDD+UPDRS3\n');
-
-fcTestIdx = [2, 3];            % 2 = Ap(-)1 RH SM-DA; 3 = Diff(-)1 Ap-dom SM-DA
-fcTestLbl = predNames(fcTestIdx);
-
-%% 14.1 Main 6 fits x 2 covariate models with diagnostics
-lmRows = {};
-for mi = 1:2
-    fprintf('\n  ============================================================\n');
-    fprintf('  [%s: %s]\n', modelLabels{mi}, modelDesc{mi});
-    fprintf('  ============================================================\n');
-    for ti = 1:numel(fcTestIdx)
-        pi = fcTestIdx(ti);
-        for hi = 1:nHipp
-            if mi == 1
-                Tlm = table(slopeSet{hi}, predData(:,pi), blSet{hi}, ...
-                            fcMean.age, sexFC, fcMean.mean_FD, baselineEduc, ...
-                    'VariableNames', {'Delta','BL_FC','BL_vol','age','sex','FD','EDUC'});
-                mdlFmla = 'Delta ~ BL_FC + BL_vol + age + sex + FD + EDUC';
-            else
-                Tlm = table(slopeSet{hi}, predData(:,pi), blSet{hi}, ...
-                            fcMean.age, sexFC, fcMean.mean_FD, baselineEduc, ...
-                            baselineDur, baselineLEDD, baselineUPDRS3, ...
-                    'VariableNames', {'Delta','BL_FC','BL_vol','age','sex','FD', ...
-                                      'EDUC','dur','LEDD','UPDRS'});
-                mdlFmla = ['Delta ~ BL_FC + BL_vol + age + sex + FD + EDUC ' ...
-                           '+ dur + LEDD + UPDRS'];
-            end
-            ok = ~any(isnan(Tlm{:,:}), 2);
-            mdl = fitlm(Tlm(ok,:), mdlFmla);
-
-            coef  = mdl.Coefficients;
-            b1    = coef{'BL_FC','Estimate'};
-            se    = coef{'BL_FC','SE'};
-            tval  = coef{'BL_FC','tStat'};
-            pval  = coef{'BL_FC','pValue'};
-            df    = mdl.DFE;
-            n_fit = mdl.NumObservations;
-            ci_lo = b1 - tinv(0.975, df) * se;
-            ci_hi = b1 + tinv(0.975, df) * se;
-
-            if mi == 1
-                Z_part = [blSet{hi}(ok), fcMean.age(ok), sexFC(ok), ...
-                          fcMean.mean_FD(ok), baselineEduc(ok)];
-                Z_part_full = [blSet{hi}, fcMean.age, sexFC, ...
-                               fcMean.mean_FD, baselineEduc];
-            else
-                Z_part = [blSet{hi}(ok), fcMean.age(ok), sexFC(ok), ...
-                          fcMean.mean_FD(ok), baselineEduc(ok), ...
-                          baselineDur(ok), baselineLEDD(ok), baselineUPDRS3(ok)];
-                Z_part_full = [blSet{hi}, fcMean.age, sexFC, ...
-                               fcMean.mean_FD, baselineEduc, ...
-                               baselineDur, baselineLEDD, baselineUPDRS3];
-            end
-            % Pearson partial unchanged (raw-space); Spearman uses partialcorr.
-            [rP, pP] = partialcorr(predData(ok,pi), slopeSet{hi}(ok), Z_part, 'Type','Pearson');
-            [rS, pS] = partialcorr(predData(:,pi), slopeSet{hi}, Z_part_full, 'Type','Spearman','Rows','complete');
-
-            cooks    = mdl.Diagnostics.CooksDistance;
-            cookThr  = 4 / n_fit;
-            influIdx = find(cooks > cookThr);
-            okSubjIdx = find(ok);
-            influSubj = okSubjIdx(influIdx);
-            if ~isempty(influSubj)
-                influPATNO = fcPATNO(influSubj);
-                [~, sortOrd] = sort(cooks(influIdx), 'descend');
-                influPATNO = influPATNO(sortOrd);
-                cooksSorted = cooks(influIdx(sortOrd));
-            else
-                influPATNO = []; cooksSorted = [];
-            end
-
-            fprintf('\n  [%s Hippocampus] ~ [%s]   (n = %d, df = %d):\n', ...
-                hippLabels{hi}, fcTestLbl{ti}, n_fit, df);
-            fprintf('    OLS       beta = %+9.3f   SE = %7.3f   95%% CI [%+.3f, %+.3f]\n', ...
-                b1, se, ci_lo, ci_hi);
-            fprintf('              t(%d) = %+.3f   p = %.4f   R^2_adj = %.3f\n', ...
-                df, tval, pval, mdl.Rsquared.Adjusted);
-            fprintf('    Pearson   r_partial   = %+.3f   p = %.4f\n', rP, pP);
-            fprintf('    Spearman  rho_partial = %+.3f   p = %.4f\n', rS, pS);
-            fprintf('    Cook''s D  max = %.3f   thr = 4/n = %.3f   flagged = %d', ...
-                max(cooks), cookThr, numel(influIdx));
-            if ~isempty(influPATNO)
-                topK = min(5, numel(influPATNO));
-                pairs = arrayfun(@(k) sprintf('%d (D=%.2f)', influPATNO(k), cooksSorted(k)), ...
-                    1:topK, 'UniformOutput', false);
-                fprintf('   top: %s\n', strjoin(pairs, ', '));
-            else
-                fprintf('\n');
-            end
-
-            lmRows{end+1} = {modelLabels{mi}, hippLabels{hi}, fcTestLbl{ti}, n_fit, df, ...
-                b1, se, ci_lo, ci_hi, tval, pval, mdl.Rsquared.Adjusted, ...
-                rP, pP, rS, pS, max(cooks), numel(influIdx)}; %#ok
-        end
-    end
-end
-
-%% 14.2 Save extended CSV (12 fits: 6 per model x 2 models)
-writetable(cell2table(vertcat(lmRows{:}), ...
-    'VariableNames',{'Model','Hippocampus','FC','n','df','beta_BL_FC','SE', ...
-    'CI_lo','CI_hi','t','p','R2_adj', ...
-    'Pearson_r_partial','Pearson_p','Spearman_rho_partial','Spearman_p', ...
-    'Cook_max','n_influential_4_over_n'}), ...
-    fullfile(outputDir,'Table_Hippocampus_LM_Targeted.csv'));
-fprintf('\n  Saved: Table_Hippocampus_LM_Targeted.csv (both models, 12 fits)\n');
-
-%% =========================================================================
-%  15. UNIFIED PREDICTION — baseline RH SM-DA FC → three outcomes
-%      Tests whether baseline FC (Ap(-)1, idxMediation) independently
-%      predicts three prospective outcomes in a single common framework:
-%        (i)   Global cognitive slope     (slopeAll(:,1))
-%        (ii)  DAT slope                  (dynSlopes(:,3))
-%        (iii) Left hippocampal slope     (slope_L)
-%      Same covariate set across all three (M1: age+sex+FD+EDUC;
-%      M2: + duration+LEDD+UPDRS-3). Spearman partial + OLS.
-%      Purpose: demonstrate FC as common upstream predictor across
-%      dopaminergic, structural, and cognitive trajectories.
-% =========================================================================
-fprintf('\n[15] Unified 3-outcome prediction: RH SM-DA FC x {cog, DAT, hipp} slopes...\n');
-
-fcV_unif = fcData(:, idxMediation);
-
-outcomeLbl = {'Cog slope (global)','DAT slope','L Hipp slope'};
-outcomeY   = {slopeAll(:,1), dynSlopes(:,3), slope_L};
-
-unifRows = {};
-for oi = 1:numel(outcomeLbl)
-    yU = outcomeY{oi};
-    for mi = 1:2
-        if mi == 1
-            Zuse = [fcMean.age, sexFC, fcMean.mean_FD, baselineEduc];
-            covLabels = {'age','sex','FD','EDUC'};
-            mdlFmla   = 'Outcome ~ BL_FC + age + sex + FD + EDUC';
-        else
-            Zuse = [fcMean.age, sexFC, fcMean.mean_FD, baselineEduc, ...
-                    baselineDur, baselineLEDD, baselineUPDRS3];
-            covLabels = {'age','sex','FD','EDUC','dur','LEDD','UPDRS'};
-            mdlFmla   = ['Outcome ~ BL_FC + age + sex + FD + EDUC ' ...
-                         '+ dur + LEDD + UPDRS'];
-        end
-        ok = ~isnan(fcV_unif) & ~isnan(yU) & all(~isnan(Zuse),2);
-        n_unif = sum(ok);
-        if n_unif < 20
-            fprintf('  [%s | %s] n = %d — too small, skipping\n', outcomeLbl{oi}, modelLabels{mi}, n_unif);
-            continue
-        end
-
-        % Spearman partial
-        [rhoU, pU_sp] = partialcorr(fcV_unif(ok), yU(ok), Zuse(ok,:), 'Type','Spearman');
-
-        % OLS with named variables
-        if mi == 1
-            Tunif = table(yU, fcV_unif, fcMean.age, sexFC, fcMean.mean_FD, baselineEduc, ...
-                'VariableNames', {'Outcome','BL_FC','age','sex','FD','EDUC'});
-        else
-            Tunif = table(yU, fcV_unif, fcMean.age, sexFC, fcMean.mean_FD, baselineEduc, ...
-                          baselineDur, baselineLEDD, baselineUPDRS3, ...
-                'VariableNames', {'Outcome','BL_FC','age','sex','FD','EDUC', ...
-                                  'dur','LEDD','UPDRS'});
-        end
-        ok_tbl = ~any(isnan(Tunif{:,:}), 2);
-        mdlU = fitlm(Tunif(ok_tbl,:), mdlFmla);
-        coefU = mdlU.Coefficients;
-        b1U   = coefU{'BL_FC','Estimate'};
-        seU   = coefU{'BL_FC','SE'};
-        pU_ols= coefU{'BL_FC','pValue'};
-        dfU   = mdlU.DFE;
-        ciLo  = b1U - tinv(0.975, dfU)*seU;
-        ciHi  = b1U + tinv(0.975, dfU)*seU;
-
-        fprintf('\n  [%s | %s]  n = %d  df = %d\n', outcomeLbl{oi}, modelLabels{mi}, n_unif, dfU);
-        fprintf('    Spearman  rho = %+.3f   p = %.4f\n', rhoU, pU_sp);
-        fprintf('    OLS       beta = %+9.4f   SE = %7.4f   95%% CI [%+.4f, %+.4f]   p = %.4f\n', ...
-            b1U, seU, ciLo, ciHi, pU_ols);
-
-        unifRows{end+1} = {modelLabels{mi}, outcomeLbl{oi}, n_unif, dfU, ...
-            rhoU, pU_sp, b1U, seU, ciLo, ciHi, pU_ols}; %#ok
-    end
-end
-
-writetable(cell2table(vertcat(unifRows{:}), ...
-    'VariableNames',{'Model','Outcome','n','df','rho_Spearman','p_Spearman', ...
-    'beta_OLS','SE','CI_lo','CI_hi','p_OLS'}), ...
-    fullfile(outputDir,'Table_Unified_FC_Predictions.csv'));
-fprintf('\n  Saved: Table_Unified_FC_Predictions.csv\n');
-
-%% =========================================================================
-%  16. PARALLEL MEDIATION — FC → {DAT slope, L hipp slope} → Cog slope
-%      Two mediators tested simultaneously. Preacher & Hayes percentile
-%      bootstrap, 5,000 resamples, 95% CI on indirect effects.
-%      Covariates (M1 primary): age + sex + FD + EDUC.
-%      Paths:
-%        a1: FC → DAT slope            (OLS, partial)
-%        a2: FC → L hipp slope         (OLS, partial)
-%        b1: DAT slope → cog slope     (partial on FC, hipp, covariates)
-%        b2: hipp slope → cog slope    (partial on FC, DAT, covariates)
-%        c:  total FC → cog slope
-%        c': direct FC → cog slope after both mediators
-%      Specific indirects: ab1 = a1*b1, ab2 = a2*b2
-%      Total indirect = ab1 + ab2.  Significance via 95% bootstrap CI.
-% =========================================================================
-fprintf('\n[16] Parallel mediation: FC -> {DAT slope, L hipp slope} -> Cog slope...\n');
-
-nBoot = 5000;
-rng(42, 'twister');   % reproducibility
-
-fcV_m   = fcData(:, idxMediation);
-cogV_m  = slopeAll(:,1);
-datV_m  = dynSlopes(:,3);
-hippV_m = slope_L;
-
-C_med = [fcMean.age, sexFC, fcMean.mean_FD, baselineEduc];
-
-ok_m = ~isnan(fcV_m) & ~isnan(cogV_m) & ~isnan(datV_m) & ~isnan(hippV_m) & all(~isnan(C_med),2);
-n_med = sum(ok_m);
-fprintf('  n (complete on FC + cog + DAT + hipp + M1 covs): %d\n', n_med);
-
-if n_med < 30
-    fprintf('  [warn] n too small for stable mediation bootstrap — reporting point estimates only\n');
-    nBoot = 0;
-end
-
-FC_m   = fcV_m(ok_m);
-COG_m  = cogV_m(ok_m);
-DAT_m  = datV_m(ok_m);
-HIPP_m = hippV_m(ok_m);
-Cm     = C_med(ok_m,:);
-addIntercept = @(X) [ones(size(X,1),1), X];
-
-% Point estimates
-% a paths: mediator ~ FC + C
-X_a  = addIntercept([FC_m, Cm]);
-ba1  = X_a \ DAT_m;   a1 = ba1(2);
-ba2  = X_a \ HIPP_m;  a2 = ba2(2);
-% b paths and c': cog ~ FC + DAT + HIPP + C
-X_b  = addIntercept([FC_m, DAT_m, HIPP_m, Cm]);
-bb   = X_b \ COG_m;
-cPrime = bb(2);
-b1_m   = bb(3);
-b2_m   = bb(4);
-% Total effect c: cog ~ FC + C
-bc   = X_a \ COG_m;   c_tot = bc(2);
-
-ab1 = a1 * b1_m;
-ab2 = a2 * b2_m;
-abTot = ab1 + ab2;
-
-% Bootstrap
-if nBoot > 0
-    ab1_b = nan(nBoot,1);
-    ab2_b = nan(nBoot,1);
-    abT_b = nan(nBoot,1);
-    cP_b  = nan(nBoot,1);
-    a1_b  = nan(nBoot,1);
-    a2_b  = nan(nBoot,1);
-    b1_b  = nan(nBoot,1);
-    b2_b  = nan(nBoot,1);
-    for bi = 1:nBoot
-        idx = randi(n_med, n_med, 1);
-        FCb = FC_m(idx); COGb = COG_m(idx);
-        DATb = DAT_m(idx); HIPPb = HIPP_m(idx);
-        Cb   = Cm(idx,:);
-        Xab = addIntercept([FCb, Cb]);
-        a1b = Xab \ DATb;   a1_b(bi) = a1b(2);
-        a2b = Xab \ HIPPb;  a2_b(bi) = a2b(2);
-        Xbb = addIntercept([FCb, DATb, HIPPb, Cb]);
-        bbb = Xbb \ COGb;   cP_b(bi) = bbb(2); b1_b(bi) = bbb(3); b2_b(bi) = bbb(4);
-        ab1_b(bi) = a1_b(bi) * b1_b(bi);
-        ab2_b(bi) = a2_b(bi) * b2_b(bi);
-        abT_b(bi) = ab1_b(bi) + ab2_b(bi);
-    end
-    CI_ab1 = prctile(ab1_b, [2.5 97.5]);
-    CI_ab2 = prctile(ab2_b, [2.5 97.5]);
-    CI_abT = prctile(abT_b, [2.5 97.5]);
-    CI_cP  = prctile(cP_b,  [2.5 97.5]);
-    sig_ab1 = (CI_ab1(1)>0) || (CI_ab1(2)<0);
-    sig_ab2 = (CI_ab2(1)>0) || (CI_ab2(2)<0);
-    sig_abT = (CI_abT(1)>0) || (CI_abT(2)<0);
-else
-    CI_ab1 = [NaN NaN]; CI_ab2 = [NaN NaN]; CI_abT = [NaN NaN]; CI_cP = [NaN NaN];
-    sig_ab1 = false; sig_ab2 = false; sig_abT = false;
-end
-
-propMed = NaN;
-if abs(c_tot) > eps, propMed = 100 * abTot / c_tot; end
-
-fprintf('\n  Point estimates:\n');
-fprintf('    a1  (FC -> DAT slope)        = %+.4f\n', a1);
-fprintf('    a2  (FC -> L hipp slope)     = %+.4f\n', a2);
-fprintf('    b1  (DAT -> cog | FC, hipp)  = %+.4f\n', b1_m);
-fprintf('    b2  (hipp -> cog | FC, DAT)  = %+.4f\n', b2_m);
-fprintf('    c   (total FC -> cog)        = %+.4f\n', c_tot);
-fprintf('    c'' (direct FC -> cog)       = %+.4f\n', cPrime);
-
-fprintf('\n  Indirect effects (bootstrap 95%% CI, %d reps):\n', nBoot);
-if sig_ab1, s1 = 'SIG (CI excludes 0)'; else, s1 = 'n.s.'; end
-if sig_ab2, s2 = 'SIG (CI excludes 0)'; else, s2 = 'n.s.'; end
-if sig_abT, sT = 'SIG (CI excludes 0)'; else, sT = 'n.s.'; end
-fprintf('    ab1 (via DAT slope)   = %+.4f   [%+.4f, %+.4f]   %s\n', ab1, CI_ab1(1), CI_ab1(2), s1);
-fprintf('    ab2 (via L hipp)      = %+.4f   [%+.4f, %+.4f]   %s\n', ab2, CI_ab2(1), CI_ab2(2), s2);
-fprintf('    ab total              = %+.4f   [%+.4f, %+.4f]   %s\n', abTot, CI_abT(1), CI_abT(2), sT);
-fprintf('    Proportion mediated (ab_total / c) = %+.1f%%\n', propMed);
-
-% Save mediation table
-medRows = { ...
-    {'a1_FC_to_DAT',      a1,     NaN, NaN};
-    {'a2_FC_to_Hipp',     a2,     NaN, NaN};
-    {'b1_DAT_to_Cog',     b1_m,   NaN, NaN};
-    {'b2_Hipp_to_Cog',    b2_m,   NaN, NaN};
-    {'c_total',           c_tot,  NaN, NaN};
-    {'c_prime_direct',    cPrime, CI_cP(1), CI_cP(2)};
-    {'ab1_indirect_DAT',  ab1,    CI_ab1(1), CI_ab1(2)};
-    {'ab2_indirect_Hipp', ab2,    CI_ab2(1), CI_ab2(2)};
-    {'ab_total_indirect', abTot,  CI_abT(1), CI_abT(2)};
-    {'proportion_mediated_pct', propMed, NaN, NaN}};
-writetable(cell2table(vertcat(medRows{:}), ...
-    'VariableNames', {'Path','Estimate','CI_lo','CI_hi'}), ...
-    fullfile(outputDir, 'Table_ParallelMediation_FC_to_Cog.csv'));
-fprintf('\n  Saved: Table_ParallelMediation_FC_to_Cog.csv\n');
-
-%% =========================================================================
-%  17. DIRECT INDEPENDENCE TESTS — FC → cog, controlling for mediators
-%      Does baseline FC retain prognostic value beyond the downstream
-%      markers? Four nested models, same n_med sample (intersection of
-%      FC + cog + DAT + hipp + M1 covariates):
-%        (A) Base:          cog ~ FC + C
-%        (B) + DAT slope:   cog ~ FC + DAT + C
-%        (C) + hipp slope:  cog ~ FC + HIPP + C
-%        (D) + both:        cog ~ FC + DAT + HIPP + C     [= c' from §16]
-%      Compare beta_FC across the four fits — if FC effect survives (D),
-%      FC has residual prognostic value beyond both mediators.
-% =========================================================================
-fprintf('\n[17] Direct independence: FC → cog, controlling for mediator(s)...\n');
-
-indepSpecs = { ...
-    'A_Base',          []; ...
-    'B_plusDAT',       'DAT'; ...
-    'C_plusHipp',      'HIPP'; ...
-    'D_plusBoth',      'BOTH'};
-
-indepRows = {};
-for mi = 1:size(indepSpecs, 1)
-    model_name = indepSpecs{mi, 1};
-    med_type   = indepSpecs{mi, 2};
-    if isempty(med_type)
-        Tlm = table(COG_m, FC_m, Cm(:,1), Cm(:,2), Cm(:,3), Cm(:,4), ...
-            'VariableNames', {'COG','FC','age','sex','FD','EDUC'});
-        mdlFmla = 'COG ~ FC + age + sex + FD + EDUC';
-    elseif strcmp(med_type,'DAT')
-        Tlm = table(COG_m, FC_m, DAT_m, Cm(:,1), Cm(:,2), Cm(:,3), Cm(:,4), ...
-            'VariableNames', {'COG','FC','DAT','age','sex','FD','EDUC'});
-        mdlFmla = 'COG ~ FC + DAT + age + sex + FD + EDUC';
-    elseif strcmp(med_type,'HIPP')
-        Tlm = table(COG_m, FC_m, HIPP_m, Cm(:,1), Cm(:,2), Cm(:,3), Cm(:,4), ...
-            'VariableNames', {'COG','FC','HIPP','age','sex','FD','EDUC'});
-        mdlFmla = 'COG ~ FC + HIPP + age + sex + FD + EDUC';
-    else  % BOTH
-        Tlm = table(COG_m, FC_m, DAT_m, HIPP_m, Cm(:,1), Cm(:,2), Cm(:,3), Cm(:,4), ...
-            'VariableNames', {'COG','FC','DAT','HIPP','age','sex','FD','EDUC'});
-        mdlFmla = 'COG ~ FC + DAT + HIPP + age + sex + FD + EDUC';
-    end
-    ok_tbl = ~any(isnan(Tlm{:,:}), 2);
-    mdl = fitlm(Tlm(ok_tbl,:), mdlFmla);
-
-    coef  = mdl.Coefficients;
-    b_FC  = coef{'FC','Estimate'};
-    se_FC = coef{'FC','SE'};
-    t_FC  = coef{'FC','tStat'};
-    p_FC  = coef{'FC','pValue'};
-    df    = mdl.DFE;
-    n_fit = mdl.NumObservations;
-    ci_lo = b_FC - tinv(0.975, df)*se_FC;
-    ci_hi = b_FC + tinv(0.975, df)*se_FC;
-
-    fprintf('\n  [%s]   n = %d, df = %d\n', model_name, n_fit, df);
-    fprintf('    beta_FC = %+9.4f   SE = %.4f   95%% CI [%+.4f, %+.4f]\n', b_FC, se_FC, ci_lo, ci_hi);
-    fprintf('    t(%d) = %+.3f   p = %.4f   R^2_adj = %.3f\n', df, t_FC, p_FC, mdl.Rsquared.Adjusted);
-
-    indepRows{end+1} = {model_name, n_fit, df, b_FC, se_FC, ci_lo, ci_hi, t_FC, p_FC, mdl.Rsquared.Adjusted}; %#ok
-end
-
-writetable(cell2table(vertcat(indepRows{:}), ...
-    'VariableNames',{'Model','n','df','beta_FC','SE','CI_lo','CI_hi','t','p_FC','R2_adj'}), ...
-    fullfile(outputDir,'Table_FC_Cog_Independence.csv'));
-fprintf('\n  Saved: Table_FC_Cog_Independence.csv\n');
-
-%% =========================================================================
-%  18. SERIAL MEDIATION (EXPLORATORY) — FC → DAT → hipp → cog (+ reverse)
-%      Three specific indirects per order:
-%        IND1: FC → M1 → cog        (simple)
-%        IND2: FC → M2 → cog        (simple, bypass M1)
-%        IND3: FC → M1 → M2 → cog   (serial)
-%      Total indirect = IND1 + IND2 + IND3.
-%      Forward order:  M1 = DAT,  M2 = hipp
-%      Reverse order:  M1 = hipp, M2 = DAT   (sensitivity)
-%      Covariates: M1 primary = age + sex + FD + EDUC.
-%      Preacher & Hayes percentile bootstrap, 5,000 reps.
-%      CAVEAT: with 2-timepoint slopes we cannot establish true temporal
-%      order — "serial" here is statistical, not causal.
-% =========================================================================
-fprintf('\n[18] Serial mediation (exploratory): FC → M1 → M2 → cog...\n');
-
-if n_med < 30
-    fprintf('  [warn] n = %d too small for serial mediation bootstrap — skipping\n', n_med);
-else
-    rng(42, 'twister');
-
-    orderLbls = {'forward_FC_DAT_Hipp_Cog','reverse_FC_Hipp_DAT_Cog'};
-    serialRows = {};
-
-    for oi = 1:2
-        if oi == 1
-            M1name = 'DAT'; M2name = 'Hipp';
-            M1v = DAT_m; M2v = HIPP_m;
-        else
-            M1name = 'Hipp'; M2name = 'DAT';
-            M1v = HIPP_m; M2v = DAT_m;
-        end
-        fprintf('\n  === [%s: M1 = %s, M2 = %s] ===\n', orderLbls{oi}, M1name, M2name);
-
-        % Point estimates
-        X_FCC  = addIntercept([FC_m, Cm]);
-        X_FCM1C = addIntercept([FC_m, M1v, Cm]);
-        X_full  = addIntercept([FC_m, M1v, M2v, Cm]);
-        a1  = (X_FCC  \ M1v); a1 = a1(2);
-        bM2 = (X_FCM1C \ M2v); a2 = bM2(2); d21 = bM2(3);
-        bY  = (X_full  \ COG_m); cPrime = bY(2); b1 = bY(3); b2 = bY(4);
-        bC  = (X_FCC  \ COG_m); cTot = bC(2);
-
-        IND1 = a1 * b1;            % FC → M1 → cog
-        IND2 = a2 * b2;            % FC → M2 → cog (bypass M1)
-        IND3 = a1 * d21 * b2;      % FC → M1 → M2 → cog (serial)
-        INDT = IND1 + IND2 + IND3;
-
-        % Bootstrap
-        IND1_b = nan(nBoot,1); IND2_b = nan(nBoot,1);
-        IND3_b = nan(nBoot,1); INDT_b = nan(nBoot,1);
-        for bi = 1:nBoot
-            idx = randi(n_med, n_med, 1);
-            FCb = FC_m(idx); COGb = COG_m(idx);
-            M1b = M1v(idx);  M2b = M2v(idx);
-            Cb  = Cm(idx,:);
-            Xa1 = addIntercept([FCb, Cb]);
-            t1  = Xa1 \ M1b;             a1b = t1(2);
-            Xa2 = addIntercept([FCb, M1b, Cb]);
-            t2  = Xa2 \ M2b;             a2b = t2(2); d21b = t2(3);
-            Xb  = addIntercept([FCb, M1b, M2b, Cb]);
-            t3  = Xb  \ COGb;            b1b = t3(3); b2b = t3(4);
-            IND1_b(bi) = a1b * b1b;
-            IND2_b(bi) = a2b * b2b;
-            IND3_b(bi) = a1b * d21b * b2b;
-            INDT_b(bi) = IND1_b(bi) + IND2_b(bi) + IND3_b(bi);
-        end
-        CI_IND1 = prctile(IND1_b, [2.5 97.5]);
-        CI_IND2 = prctile(IND2_b, [2.5 97.5]);
-        CI_IND3 = prctile(IND3_b, [2.5 97.5]);
-        CI_INDT = prctile(INDT_b, [2.5 97.5]);
-
-        sigFn = @(ci) (ci(1)>0) || (ci(2)<0);
-        if sigFn(CI_IND1), s1 = 'SIG'; else, s1 = 'n.s.'; end
-        if sigFn(CI_IND2), s2 = 'SIG'; else, s2 = 'n.s.'; end
-        if sigFn(CI_IND3), s3 = 'SIG'; else, s3 = 'n.s.'; end
-        if sigFn(CI_INDT), sT = 'SIG'; else, sT = 'n.s.'; end
-
-        fprintf('    a1  (FC -> %s)             = %+.4f\n', M1name, a1);
-        fprintf('    a2  (FC -> %s | %s)         = %+.4f\n', M2name, M1name, a2);
-        fprintf('    d21 (%s -> %s)              = %+.4f\n', M1name, M2name, d21);
-        fprintf('    b1  (%s -> cog)            = %+.4f\n', M1name, b1);
-        fprintf('    b2  (%s -> cog)            = %+.4f\n', M2name, b2);
-        fprintf('    c   (total FC -> cog)      = %+.4f\n', cTot);
-        fprintf('    c'' (direct FC -> cog)     = %+.4f\n', cPrime);
-        fprintf('    IND1 (FC -> %s -> cog)         = %+.4f  [%+.4f, %+.4f]   %s\n', M1name, IND1, CI_IND1(1), CI_IND1(2), s1);
-        fprintf('    IND2 (FC -> %s -> cog)         = %+.4f  [%+.4f, %+.4f]   %s\n', M2name, IND2, CI_IND2(1), CI_IND2(2), s2);
-        fprintf('    IND3 (FC -> %s -> %s -> cog)   = %+.4f  [%+.4f, %+.4f]   %s\n', M1name, M2name, IND3, CI_IND3(1), CI_IND3(2), s3);
-        fprintf('    Total indirect                  = %+.4f  [%+.4f, %+.4f]   %s\n', INDT, CI_INDT(1), CI_INDT(2), sT);
-        if abs(cTot) > eps
-            fprintf('    Proportion mediated (IND_total / c) = %+.1f%%\n', 100*INDT/cTot);
-        end
-
-        % Append to save table
-        serialRows{end+1} = {orderLbls{oi}, sprintf('a1_FC_to_%s', M1name),               a1,     NaN, NaN}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, sprintf('a2_FC_to_%s_given_%s', M2name, M1name), a2,  NaN, NaN}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, sprintf('d21_%s_to_%s', M1name, M2name),      d21,    NaN, NaN}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, sprintf('b1_%s_to_Cog', M1name),              b1,     NaN, NaN}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, sprintf('b2_%s_to_Cog', M2name),              b2,     NaN, NaN}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, 'c_total',                                    cTot,   NaN, NaN}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, 'c_prime_direct',                             cPrime, NaN, NaN}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, sprintf('IND1_FC_%s_Cog', M1name),            IND1,   CI_IND1(1), CI_IND1(2)}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, sprintf('IND2_FC_%s_Cog', M2name),            IND2,   CI_IND2(1), CI_IND2(2)}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, sprintf('IND3_FC_%s_%s_Cog', M1name, M2name), IND3,   CI_IND3(1), CI_IND3(2)}; %#ok
-        serialRows{end+1} = {orderLbls{oi}, 'IND_total',                                  INDT,   CI_INDT(1), CI_INDT(2)}; %#ok
-    end
-
-    writetable(cell2table(vertcat(serialRows{:}), ...
-        'VariableNames', {'Order','Path','Estimate','CI_lo','CI_hi'}), ...
-        fullfile(outputDir, 'Table_SerialMediation_FC.csv'));
-    fprintf('\n  Saved: Table_SerialMediation_FC.csv\n');
-end
