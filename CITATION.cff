@@ -1,8 +1,7 @@
 cff-version: 1.2.0
-message: "If you use this code, please cite the paper and the archived release."
+message: "If you use this code, please cite the paper and this repository."
 title: "Apathy marks brain network and genetic vulnerability to cognitive decline in Parkinson's disease: analysis code"
 type: software
-version: 1.0.0
 date-released: 2026-10-22
 license: MIT
 repository-code: "https://github.com/Bahaatallah/Apathy_PPMI"

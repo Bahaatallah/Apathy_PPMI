@@ -2,7 +2,7 @@
 
 Code for the analyses and figures of *Apathy marks brain network and genetic vulnerability to cognitive decline in Parkinson's disease* (Parkinson's Precision Medicine Initiative cohort; primary connectivity sample N = 305). The repository holds only the code behind the reported results; scripts for the supplementary analyses are available from the corresponding author on request. No participant-level data are included.
 
-Repository: https://github.com/Bahaatallah/Apathy_PPMI (release v1.0.0: https://github.com/Bahaatallah/Apathy_PPMI/releases/tag/v1.0.0). Licence: MIT (`LICENSE`). Citation metadata: `CITATION.cff`.
+Repository: https://github.com/Bahaatallah/Apathy_PPMI. Licence: MIT (`LICENSE`). Citation metadata: `CITATION.cff`.
 
 ## Layout
 
